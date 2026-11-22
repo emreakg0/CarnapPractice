@@ -76,6 +76,10 @@ test("Fitch rejects bad premises, future or inaccessible lines, and malformed ra
   const premises = ["P -> Q", "Q -> R"]
   const valid = "P -> Q :PR\nQ -> R :PR\n   P :AS\n   Q :->E 1,3\n   R :->E 2,4\nP -> R :->I 3-5"
   assert.equal(validateProof(valid, premises, "P -> R"), undefined)
+  assert.equal(validateProof("P -> Q :PR", premises, "P -> R")?.kind, "incomplete")
+  assert.equal(validateProof("P :E1", premises, "P -> R")?.kind, "syntax")
+  assert.equal(validateProof("P :R 1,", premises, "P -> R")?.kind, "syntax")
+  assert.equal(validateProof("P :R 1", premises, "P -> R")?.kind, "inference")
   assert.equal(validateProof(valid.replace("E 1,3", "E1 3"), premises, "P -> R"), undefined)
   assert.match(validateProof("P -> R :PR", premises, "P -> R")?.message ?? "", /given premises/)
   assert.match(validateProof(valid.replace("1,3", "1,5"), premises, "P -> R")?.message ?? "", /earlier assertion/)

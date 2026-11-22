@@ -13,7 +13,7 @@ and the screenshot supplied for this task.
 
 | Exercise | Primary reference | CarnapPractice baseline |
 | --- | --- | --- |
-| TFL derivation | [Public Fitch playground](original-proof.png) | [Nested subproofs](../../apps/web/ui-snapshots/darwin/classic-proof.png), [invalid line reference](../../apps/web/ui-snapshots/darwin/classic-proof-error.png) |
+| TFL derivation | [Public Fitch playground](original-proof.png) | [Nested subproofs](../../apps/web/ui-snapshots/darwin/classic-proof.png), [invalid line reference](../../apps/web/ui-snapshots/darwin/classic-proof-error.png), [syntax error](../../apps/web/ui-snapshots/darwin/classic-proof-syntax.png) |
 | FOL symbolization | [Public FOL translation widget](original-symbolization.png) | [Formula entry](../../apps/web/ui-snapshots/darwin/classic-symbolization.png), [grammatical error](../../apps/web/ui-snapshots/darwin/classic-symbolization-error.png) |
 | FOL syntax and scope | [Supplied checkbox question](primary-syntax.png), [public syntax-tree example](original-syntax.png) | [Classic checkbox question](../../apps/web/ui-snapshots/darwin/classic-syntax.png) |
 | FOL interpretation | [Public model-entry widget](original-model.png) | [Given interpretation with truth choices](../../apps/web/ui-snapshots/darwin/classic-interpretation.png) |
@@ -24,8 +24,9 @@ and the screenshot supplied for this task.
   gutter, vertical Fitch guides, and horizontal lines under assumptions
   and the last premise. The baseline reproduces those features and the
   original colon and citation syntax, including the numbered `--`
-  separator. The app displays the goal for every question and gives a
-  red line marker and inline error with the citation that failed.
+  separator. Practice shows a live proof preview beneath the editor.
+  The goal marker explains an incomplete proof, and line markers
+  distinguish valid lines, syntax errors, and inference errors.
   Enter carries indentation forward. The original can enable Tab
   indentation per activity. The app uses Alt/Option with arrow keys
   so Tab remains available for navigation.
@@ -51,8 +52,7 @@ and the screenshot supplied for this task.
   blue-gray borders, and small square action buttons. Labels and button
   colors are darker for readability. The card narrows to fit a phone,
   and both themes are available. Modern uses the same exercises with
-  styled selections, formula and rule insertion controls, and a rendered
-  proof preview.
+  styled selections and formula and rule insertion controls.
 
 The source references include the exercise and proof CSS, the proof-page
 wrapper, and the GHCJS exercise widgets.

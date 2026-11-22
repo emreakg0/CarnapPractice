@@ -30,7 +30,9 @@ export function proofRows(source: string) {
 
 type Line = { number: number; formula: Formula; scope: number[] }
 type Range = { first: Line; last: Line; parent: number[] }
-export type ProofIssue = { line?: number; message: string }
+export type ProofIssue =
+  | { kind: "incomplete"; message: string; line?: never }
+  | { kind: "syntax" | "inference"; message: string; line: number }
 const equal = (left: Formula, right: Formula) => formulaKey(left) === formulaKey(right)
 const binary = (node: Formula, op: string) => node.kind === "binary" && node.op === op ? node : undefined
 const negates = (negation: Formula, body: Formula) => negation.kind === "not" && equal(negation.body, body)
@@ -104,7 +106,7 @@ function matchesRule(rule: Rule, result: Formula, cited: Formula[], ranges: Rang
 }
 
 export function validateProof(source: string, premises: readonly string[], conclusion: string): ProofIssue | undefined {
-  if (source.length > 16000) return { message: "Use a proof shorter than 16,000 characters." }
+  if (source.length > 16000) return { kind: "incomplete", message: "Use a proof shorter than 16,000 characters." }
   const given = premises.map(premise => parseFormula(premise, "TFL"))
   const target = parseFormula(conclusion, "TFL")
   const lines = new Map<number, Line>()
@@ -116,8 +118,11 @@ export function validateProof(source: string, premises: readonly string[], concl
   const rows = proofRows(source)
   for (const [index, row] of rows.entries()) {
     const number = index + 1
-    const issue = (message: string): ProofIssue => ({ line: number, message })
+    const issue = (message: string, kind: "syntax" | "inference" = "inference"): ProofIssue => ({ kind, line: number, message })
     if (!row.raw.trim()) continue
+    if (!row.separator && (!Object.hasOwn(rules, row.rule) || row.extra.length)) {
+      return issue("Enter a formula followed by a colon and a known rule, such as P :R 1.", "syntax")
+    }
     const indent = row.indent.replace(/\t/g, "   ")
     const previousDepth = open.length
     while (open.length && !indent.startsWith(open.at(-1)!.indent)) {
@@ -132,16 +137,15 @@ export function validateProof(source: string, premises: readonly string[], concl
       premiseSection = false
       continue
     }
+    const rule = row.rule as Rule
+    let formula: Formula
+    try { formula = parseFormula(row.formula, "TFL") } catch (error) {
+      return issue(error instanceof Error ? error.message : "Invalid formula.", "syntax")
+    }
     const startsBlock = indent !== parentIndent
     if (startsBlock && row.rule !== "AS") return issue("Start an indented subproof with AS.")
     if (startsBlock && previousDepth > open.length) return issue("Put a -- separator between sibling subproofs, or return to the earlier indentation.")
     if (row.rule === "AS" && !startsBlock) return issue("Indent the first line of a subproof before using AS.")
-    if (!Object.hasOwn(rules, row.rule) || row.extra.length) return issue("Enter a formula followed by a colon and a rule, such as P :R 1.")
-    const rule = row.rule as Rule
-    let formula: Formula
-    try { formula = parseFormula(row.formula, "TFL") } catch (error) {
-      return issue(error instanceof Error ? error.message : "Invalid formula.")
-    }
     if (rule === "PR" && (!premiseSection || startsBlock || !given.some(premise => equal(premise, formula)))) {
       return issue("PR must be one of the given premises at the top level before the derivation.")
     }
@@ -152,7 +156,7 @@ export function validateProof(source: string, premises: readonly string[], concl
     const blocks: Range[] = []
     const refs = row.refs.trim()
     if (refs) {
-      if (!/^\d+(?:\s*-\s*\d+)?(?:(?:\s*,\s*|\s+)\d+(?:\s*-\s*\d+)?)*$/.test(refs)) return issue("Separate references with commas or spaces. Use a hyphen for a subproof range, such as 2–4 written 2-4.")
+      if (!/^\d+(?:\s*-\s*\d+)?(?:(?:\s*,\s*|\s+)\d+(?:\s*-\s*\d+)?)*$/.test(refs)) return issue("Separate references with commas or spaces. Use a hyphen for a subproof range, such as 2–4 written 2-4.", "syntax")
       for (const [ref] of refs.matchAll(/\d+(?:\s*-\s*\d+)?/g)) {
         const [start, end] = ref.split("-").map(Number)
         if (end !== undefined && start !== end) {
@@ -173,6 +177,6 @@ export function validateProof(source: string, premises: readonly string[], concl
     if (startsBlock) open.push({ indent, first: last })
     if (!scope.length) final = last
   }
-  if (open.length) return { message: "Close the open subproof and finish at the top level." }
-  if (!final || !equal(target, final.formula)) return { message: `The last top-level line must be ${printFormula(target)}.` }
+  if (open.length) return { kind: "incomplete", message: "Close the open subproof and finish at the top level." }
+  if (!final || !equal(target, final.formula)) return { kind: "incomplete", message: `The last top-level line must be ${printFormula(target)}.` }
 }

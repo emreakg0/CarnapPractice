@@ -1,17 +1,37 @@
 "use client"
 
-import { useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react"
 import { parseFormula, printFormula } from "@/lib/formula"
-import { proofRows, rules } from "@/lib/proof"
-import type { Grade } from "@/lib/grading"
+import { proofRows, rules, type ProofIssue } from "@/lib/proof"
 
-export function ProofEditor({ value, onChange, modern, grade, onCheck }: {
-  value: string; onChange: (value: string) => void; modern: boolean; grade?: Grade; onCheck: () => void
+function proofLayout(source: string) {
+  const scopes: number[] = []
+  return proofRows(source).map(row => {
+    const columns = row.indent.replace(/\t/g, "   ").length
+    if (row.raw.trim()) {
+      while (scopes.length && columns < scopes.at(-1)!) scopes.pop()
+      if (!row.separator && columns > (scopes.at(-1) ?? 0)) scopes.push(columns)
+    }
+    return { ...row, columns, scopes: [...scopes] }
+  })
+}
+
+export function ProofEditor({ value, onChange, modern, issue, showStatus, onCheck }: {
+  value: string; onChange: (value: string) => void; modern: boolean; issue?: ProofIssue; showStatus: boolean; onCheck: () => void
 }) {
   const field = useRef<HTMLTextAreaElement>(null)
   const [scroll, setScroll] = useState({ top: 0, left: 0 })
-  const rows = proofRows(value)
-  const scopes: number[] = []
+  const [visible, setVisible] = useState<{ height: number; leading: number; padding: number }>()
+  useEffect(() => {
+    const input = field.current!
+    const observer = new ResizeObserver(() => {
+      const css = getComputedStyle(input)
+      setVisible({ height: input.clientHeight, leading: Number.parseFloat(css.lineHeight), padding: Number.parseFloat(css.paddingTop) })
+    })
+    observer.observe(input)
+    return () => observer.disconnect()
+  }, [])
+  const rows = proofLayout(value)
   const finalPremise = rows.findIndex(row => row.rule !== "PR") - 1
   const premiseEnd = finalPremise === -2 ? rows.length - 1 : finalPremise
 
@@ -73,17 +93,13 @@ export function ProofEditor({ value, onChange, modern, grade, onCheck }: {
       <div className="proof-input-frame">
         <div className="proof-numbers" aria-hidden="true">
           <div style={{ transform: `translateY(${-scroll.top}px)` }}>
-            {rows.map((_, index) => <div className={grade?.line === index + 1 ? "line-error" : ""} key={index}>{index + 1}</div>)}
+            {rows.map((_, index) => <div className={issue?.line === index + 1 ? "line-error" : ""} key={index}>{index + 1}</div>)}
           </div>
         </div>
         <div className="proof-guides" aria-hidden="true">
           <div style={{ transform: `translate(${-scroll.left}px, ${-scroll.top}px)` }}>
             {rows.map((row, index) => {
-              const columns = row.indent.replace(/\t/g, "   ").length
-              if (row.raw.trim()) {
-                while (scopes.length && columns < scopes.at(-1)!) scopes.pop()
-                if (!row.separator && columns > (scopes.at(-1) ?? 0)) scopes.push(columns)
-              }
+              const { columns, scopes } = row
               return <div key={index} className="guide-row">
                 {index === premiseEnd && <i className="premise-guide" style={{ width: `${row.raw.trim().length + 1}ch` }} />}
                 {scopes.map(column => <i key={column} className={row.rule === "AS" && column === columns ? "assumption-guide" : ""}
@@ -96,28 +112,57 @@ export function ProofEditor({ value, onChange, modern, grade, onCheck }: {
           onChange={event => onChange(event.target.value)} onKeyDown={keys}
           onScroll={event => setScroll({ top: event.currentTarget.scrollTop, left: event.currentTarget.scrollLeft })}
           spellCheck={false} autoCapitalize="off" autoCorrect="off" wrap="off" maxLength={16000}
-          rows={Math.min(18, Math.max(10, rows.length + 1))} />
-        {grade?.line && <span className="proof-issue-mark" aria-hidden="true" style={{ top: `calc(var(--proof-pad) + ${grade.line - 1} * var(--proof-leading) - ${scroll.top}px)` }}>×</span>}
+          rows={Math.min(18, Math.max(6, rows.length + 1))} />
+        {showStatus && <div className="proof-line-statuses">
+          {rows.map((row, index) => {
+            const line = index + 1
+            if (!row.raw.trim() || row.separator || (issue?.line && line > issue.line)) return null
+            const offset = visible ? visible.padding + index * visible.leading - scroll.top : undefined
+            if (visible && offset !== undefined && (offset < 0 || offset + visible.leading > visible.height)) return null
+            const top = `calc(var(--proof-pad) + ${index} * var(--proof-leading) - ${scroll.top}px)`
+            if (line === issue?.line) return <ProofStatus key={line} className="proof-line-status line-error"
+              top={top} symbol={issue.kind === "syntax" ? "⚠" : "?"}
+              label={issue.kind === "syntax" ? `Syntax error on line ${line}` : `Inference error on line ${line}`}
+              detail={issue.message} />
+            return <span className="proof-line-status" key={line} style={{ top }} title={`Line ${line} is valid`}>+</span>
+          })}
+        </div>}
       </div>
       <span id="proof-entry-help" className="sr-only">Write one formula and justification per line, separated by a colon. Indent with spaces or Option or Alt plus Right Arrow. Enter keeps indentation. Tab moves to the next control.</span>
     </div>
   )
 }
 
-export function ProofPreview({ source }: { source: string }) {
-  return <div className="worked-proof" aria-label="Rendered proof">
-    {proofRows(source).map((row, index) => {
+export function ProofStatus({ className, symbol, label, detail, top }: {
+  className: string; symbol: string; label: string; detail: string; top?: string
+}) {
+  const id = useId()
+  return <span className={`proof-status ${className}`} style={{ top }}>
+    <button type="button" aria-label={label} aria-describedby={id} onClick={event => event.currentTarget.focus()}
+      onKeyDown={event => { if (event.key === "Escape") event.currentTarget.blur() }}>{symbol}</button>
+    <span className="proof-status-detail" id={id} role="tooltip"><strong>{label}.</strong> {detail}</span>
+  </span>
+}
+
+export function ProofPreview({ source, live, issue }: { source: string; live?: boolean; issue?: ProofIssue }) {
+  return <div className={`worked-proof${live ? " live-proof" : ""}`} role="group" aria-label="Rendered proof">
+    {proofLayout(source).map((row, index) => {
       if (!row.raw.trim()) return null
+      let raw = issue?.kind === "syntax" && issue.line === index + 1
       let formula = row.formula
-      try { formula = printFormula(parseFormula(formula, "TFL")) } catch { /* Keep incomplete text visible. */ }
-      const depth = Math.ceil(row.indent.replace(/\t/g, "   ").length / 3)
+      if (!row.separator) {
+        try { formula = printFormula(parseFormula(formula, "TFL"), !!live) }
+        catch { raw = true }
+        raw ||= !Object.hasOwn(rules, row.rule) || row.extra.length > 0
+      }
+      const depth = row.scopes.length
       return <div className="worked-line" key={index}>
-        <span>{index + 1}</span>
+        <span>{index + 1}{live ? "." : ""}</span>
         <span className="worked-formula">
           {Array.from({ length: depth }, (_, i) => <i key={i} aria-hidden="true" />)}
-          <span className={row.rule === "AS" ? "worked-assumption" : ""}>{formula}</span>
+          <span className={row.rule === "AS" ? "worked-assumption" : ""}>{raw ? `"${row.raw.trim()}"` : formula}</span>
         </span>
-        <span>{[row.rule, row.refs].filter(Boolean).join(" ")}</span>
+        <span>{!raw && [row.rule, row.refs].filter(Boolean).join(" ")}</span>
       </div>
     })}
   </div>

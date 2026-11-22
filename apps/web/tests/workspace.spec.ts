@@ -67,6 +67,16 @@ test("Classic proof renders line numbers and nested guides, handles the keyboard
   await input.press("Tab")
   await expect(card.getByRole("button", { name: "Submit" })).toBeFocused()
 
+  const preview = card.getByRole("group", { name: "Rendered proof" })
+  const incomplete = card.getByRole("button", { name: "Proof incomplete" })
+  await incomplete.focus()
+  await expect(card.getByRole("tooltip")).toContainText("Close the open subproof")
+  await input.fill("P:E1")
+  await expect(preview).toContainText('"P:E1"')
+  await card.getByRole("button", { name: "Syntax error on line 1" }).hover()
+  await expect(card.getByRole("tooltip")).toContainText("known rule")
+  await referenceSnapshot(card, "classic-proof-syntax.png")
+
   const question = byId["tfl-10"]
   if (question?.category !== "derivations") throw new Error("Missing proof")
   const solution = question.solution.replaceAll(" | ", " ∨ ").replaceAll(":|", ":∨").replaceAll("->", "→")
@@ -75,10 +85,17 @@ test("Classic proof renders line numbers and nested guides, handles the keyboard
   await expect(card.locator(".guide-row").nth(1).locator("i")).toHaveCount(2)
   await expect(card.locator(".guide-row").nth(1).locator(".assumption-guide")).toHaveCSS("border-bottom-width", "1px")
   await expect(input).toHaveValue(/∨E 1,2-3,5-6/)
+  await expect(preview).toContainText("∨E 1,2-3,5-6")
+  await expect(card.getByRole("button", { name: "Proof complete" })).toBeVisible()
   await input.blur()
   await referenceSnapshot(card, "classic-proof.png")
 
+  await input.fill(solution.replace(/^ +/gm, indent => " ".repeat(indent.length * 4 / 3)))
+  await expect(preview.locator(".worked-line").nth(1).locator("i")).toHaveCount(2)
+
   await input.fill(solution.replace("∨I 5", "R 3"))
+  await card.getByRole("button", { name: "Inference error on line 6" }).hover()
+  await expect(card.getByRole("tooltip")).toContainText("inside a closed or sibling subproof")
   await card.getByRole("button", { name: "Check" }).click()
   await expect(card.getByRole("status")).toContainText("Line 6: Line 3 is inside a closed or sibling subproof.")
   await expect(card.locator(".proof-numbers .line-error")).toHaveText("6")
@@ -138,6 +155,8 @@ test("exam hides feedback, preserves drafts on refresh, and grades on finish", a
   await expect(page.getByRole("timer")).toHaveText(/^(29|30):/)
   await expect(page.getByRole("button", { name: "Show hint" })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "Check" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Proof incomplete" })).toHaveCount(0)
+  await expect(page.getByRole("group", { name: "Rendered proof" })).toHaveCount(0)
   await page.getByRole("button", { name: "Next" }).click()
   const input = page.getByRole("textbox", { name: "Your formula" })
   await input.fill("Ax(Cx -> Ey(Cy & Lxy))")

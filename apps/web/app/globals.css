@@ -225,7 +225,6 @@ summary { font-weight: 600; }
 .proof-widget { width: min(100%, 31.25rem); }
 .proof-goal { position: relative; padding-right: 2rem; min-height: 1.9rem; font-size: .9375rem; }
 .proof-result { position: absolute; right: .6rem; }
-.is-incorrect .proof-result { color: var(--error-text); }
 .proof-input-frame { position: relative; --proof-pad: 1.25rem; --proof-leading: 1rem; --proof-gutter: 3.3rem; font: .833rem/var(--proof-leading) ui-monospace, monospace; }
 .proof-input-frame textarea {
   display: block;
@@ -255,7 +254,6 @@ summary { font-weight: 600; }
 .guide-row i { position: absolute; height: 100%; border-left: 1px solid currentColor; }
 .guide-row .assumption-guide { border-bottom: 1px solid currentColor; }
 .guide-row .premise-guide { left: 0; border-left: 0; border-bottom: 1px solid currentColor; }
-.proof-issue-mark { position: absolute; right: .65rem; color: var(--error-text); font-weight: 800; }
 .proof-numbers .line-error { color: var(--error-text); font-weight: 800; }
 .formula-entry { display: flex; align-items: stretch; flex-wrap: wrap; }
 .formula-entry input { width: min(100%, 25rem); min-height: 1.75rem; border: 1px solid var(--classic-line); background: var(--classic-field); font: .875rem monospace; padding: .2rem .4rem; }
@@ -365,4 +363,35 @@ summary { font-weight: 600; }
   .question-nav .action-row { gap: .35rem; }
   .question-nav .action-row button { padding-inline: .65rem; }
   .site-footer { flex-wrap: wrap; }
+}
+
+.proof-line-statuses { position: absolute; inset: 0; pointer-events: none; }
+.proof-line-status { position: absolute; right: .7rem; font-weight: 700; }
+.proof-line-status.line-error { color: var(--error-text); }
+.proof-status button { min-width: 1.35rem; pointer-events: auto; }
+.proof-status-detail {
+  position: absolute;
+  z-index: 4;
+  left: calc(100% + .45rem);
+  top: 0;
+  visibility: hidden;
+  width: min(16.5rem, 35vw);
+  padding: .45rem .55rem;
+  border: 1px solid var(--classic-text);
+  background: var(--classic-field);
+  color: var(--classic-text);
+  font: .875rem/1.4 system-ui, sans-serif;
+  pointer-events: auto;
+}
+.proof-status:hover .proof-status-detail, .proof-status:focus-within .proof-status-detail { visibility: visible; }
+.live-proof { min-height: 0; max-width: 31.25rem; margin-top: .25rem; font: 1rem/1.5 system-ui, sans-serif; }
+.live-proof .worked-line { grid-template-columns: min(16%, 3.75rem) minmax(0, 1fr) minmax(4rem, 40%); }
+.live-proof .worked-line > span:first-child { padding-right: 1.4rem; border-color: currentColor; }
+.live-proof .worked-formula { overflow-wrap: anywhere; }
+.live-proof .worked-line > span:last-child { overflow-wrap: anywhere; }
+@media (max-width: 54rem) {
+  .proof-status-detail { inset: calc(100% + .25rem) 0 auto auto; width: min(16.5rem, 65vw); }
+}
+@media (max-width: 39rem) {
+  .live-proof .worked-line > span:first-child { padding-right: .4rem; }
 }

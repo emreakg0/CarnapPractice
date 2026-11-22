@@ -23,7 +23,7 @@ change the theme. Both interfaces use the same drafts, question bank, and grader
 
 | Module | Questions | What you can practice |
 | --- | ---: | --- |
-| TFL Derivations | 10 | Numbered Fitch proofs with typed justifications, nested scopes, line citations, range citations, and line-specific feedback |
+| TFL Derivations | 10 | Numbered Fitch proofs with typed justifications, nested scopes, line citations, range citations, and a live preview with line-specific feedback |
 | FOL Symbolization | 10 | Translating with predicates, relations, quantifiers, identity, and connectives |
 | FOL Syntax and Scope | 10 | Selecting formulas, sentences, free and bound variables, main operators, and scopes, with interactive syntax trees after checking |
 | FOL Interpretations | 10 | Evaluating sentences against finite models, with witnesses or counterexamples where applicable and a relation matrix for binary predicates |
@@ -90,7 +90,7 @@ npm run test:e2e
 
 The unit suite runs in Node. Playwright starts the production build on
 port 3217 and tests real submissions and timer expiry. On macOS it uses
-installed Chrome and compares the six checked-in screenshots. On other
+installed Chrome and compares the seven checked-in screenshots. On other
 platforms, run `npx playwright install chromium` before the same
 interaction checks. See [the Classic UI reference and comparison](docs/ui-reference/README.md).
 

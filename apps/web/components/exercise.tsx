@@ -4,10 +4,10 @@ import { CircleCheck, CircleHelp } from "lucide-react"
 import { useState } from "react"
 import { parseFormula, printFormula } from "@/lib/formula"
 import type { Grade } from "@/lib/grading"
-import { rules } from "@/lib/proof"
+import { rules, validateProof } from "@/lib/proof"
 import type { Answer, Derivation, Problem } from "@/lib/problems/types"
 import { FormulaInput, ModelFields, SymbolizationKey, SyntaxChoices, SyntaxReview } from "./exercise-fields"
-import { ProofEditor, ProofPreview } from "./proof-editor"
+import { ProofEditor, ProofPreview, ProofStatus } from "./proof-editor"
 import { useExerciseStyle } from "./settings"
 import { Button } from "./ui/button"
 
@@ -23,6 +23,8 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
   const [hint, setHint] = useState(false)
   const [reveal, setReveal] = useState(false)
   const modern = style === "modern"
+  const proof = typeof answer === "string" ? answer : ""
+  const proofIssue = !exam && problem.category === "derivations" ? validateProof(proof, problem.premises, problem.conclusion) : undefined
   const actions = <div className="exercise-actions">
     <Button type="submit" disabled={busy} className="exercise-submit">{exam ? "Save answer" : "Submit"} <CircleCheck aria-hidden="true" size={16} /></Button>
     {!exam && (problem.category !== "symbolization" || modern) && <Button type="button" disabled={busy} onClick={() => onSubmit(false)} className="exercise-check">
@@ -37,21 +39,22 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
     }}>
       <span className="exercise-number"><span className="sr-only">Question </span>{number}</span>
       <span className="exercise-points">1 pts</span>
-      <div className={`exercise-body ${grade ? grade.correct ? "is-correct" : "is-incorrect" : ""}`}>
+      <div className={`exercise-body ${grade?.correct || (!exam && problem.category === "derivations" && !proofIssue) ? "is-correct" : grade ? "is-incorrect" : ""}`}>
         {problem.category === "derivations" && <>
           <div className="proof-widget">
             <div className="proof-goal classic-prompt">
               <span className="sr-only">{problem.prompt}</span>
               <ProofGoal problem={problem} />
-              {grade && <span className="proof-result" aria-hidden="true">{grade.correct ? "✓" : "!"}</span>}
+              {!exam && (!proofIssue || proofIssue.kind === "incomplete") && <ProofStatus
+                className="proof-result" symbol={proofIssue ? "⚠" : "✓"}
+                label={proofIssue ? "Proof incomplete" : "Proof complete"}
+                detail={proofIssue?.message ?? "This proof establishes the conclusion."} />}
             </div>
-            <ProofEditor modern={modern} value={typeof answer === "string" ? answer : ""}
-              onChange={onChange} grade={grade} onCheck={() => onSubmit(exam)} />
+            <ProofEditor modern={modern} value={proof}
+              onChange={onChange} issue={proofIssue} showStatus={!exam} onCheck={() => onSubmit(exam)} />
             {actions}
           </div>
-          {!exam && modern && <details className="rendered-proof"><summary>Rendered proof</summary>
-            <ProofPreview source={typeof answer === "string" ? answer : ""} />
-          </details>}
+          {!exam && <ProofPreview source={proof} live issue={proofIssue} />}
         </>}
         {problem.category === "symbolization" && <>
           <SymbolizationKey entries={problem.key} />
