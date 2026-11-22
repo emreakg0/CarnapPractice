@@ -3,7 +3,7 @@ import { test } from "node:test"
 import { analyzeVariables, children, FormulaError, formulaKey, mainOperator, parseFormula, printFormula } from "../lib/formula.ts"
 import { gradeLocally } from "../lib/grading.ts"
 import { evaluateFormula } from "../lib/interpretation.ts"
-import { proofRows, validateProof } from "../lib/proof.ts"
+import { parseProofFormula, proofRows, rulesFor, rutgersProofSystem, validateProof, type ProofSystem } from "../lib/proof.ts"
 import { bank, byId, categoryIds, examOrder, practiceOrder } from "../lib/problems/bank.ts"
 import { syntaxSelection } from "../lib/problems/syntax.ts"
 import { emptyProgress, hasAnswer, recordAttempt } from "../lib/session.ts"
@@ -41,9 +41,9 @@ test("ZachTFL justification names and aliases match the Calgary rule parser", ()
 })
 
 test("ZachTFL proof replay agrees with the observed public Carnap widget", () => {
-  assert.equal(zachFixtures.length, 124)
-  for (const { id, proof, premises, target, carnapSequent, carnapMarks, openGoal } of zachFixtures) {
-    const issue = validateProof(proof, premises, target)
+  assert.equal(zachFixtures.length, 206)
+  for (const { id, proof, premises, target, carnapSequent, carnapMarks, openGoal, system } of zachFixtures) {
+    const issue = validateProof(proof, premises, target, system as ProofSystem | undefined)
     assert.equal(!issue, carnapSequent !== null && !openGoal, id)
     if (openGoal) {
       assert.match(issue?.message ?? "", /assumption outside the given premises/, id)
@@ -51,6 +51,31 @@ test("ZachTFL proof replay agrees with the observed public Carnap widget", () =>
     } else if (!carnapSequent) {
       assert.equal(issue?.kind, carnapMarks.match(/[⚠?✗]/u)?.[0] === "⚠" ? "syntax" : "inference", id)
     }
+  }
+})
+
+test("exercise metadata controls the proof parser and derived rules", () => {
+  const modern = "thomasBolducAndZachTFL2019"
+  assert.equal(printFormula(parseProofFormula("P | Q & R", modern)), "(P ∨ Q) ∧ R")
+  assert.throws(() => parseProofFormula("P | Q & R", rutgersProofSystem), FormulaError)
+  assert.throws(() => parseProofFormula("P -> Q & R", modern), FormulaError)
+  for (const rule of ["DS", "MT", "DNE", "LEM", "DeM"]) {
+    assert.ok(Object.hasOwn(rulesFor(rutgersProofSystem), rule))
+    assert.ok(!Object.hasOwn(rulesFor(modern), rule))
+  }
+  const problem = byId["tfl-8"]
+  if (problem?.category !== "derivations") assert.fail("Missing derivation")
+  const short = "~~P:PR\nP:DNE1"
+  assert.equal(gradeLocally(problem, short).correct, true)
+  assert.equal(gradeLocally({ ...problem, system: modern }, short).correct, false)
+  assert.equal(gradeLocally({ ...problem, system: modern }, problem.solution).correct, true)
+
+  for (const item of bank) {
+    if (item.category !== "derivations") continue
+    const record = zachFixtures.find(({ id }) => id === `${item.id} worked solution`)
+    assert.equal(item.system, rutgersProofSystem)
+    assert.equal(record?.proof, item.solution, item.id)
+    assert.equal(formulaKey(parseProofFormula(record!.target, item.system)), formulaKey(parseProofFormula(item.conclusion, item.system)))
   }
 })
 

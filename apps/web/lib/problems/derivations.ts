@@ -1,3 +1,4 @@
+import { rutgersProofSystem } from "../proof.ts"
 import type { Derivation } from "./types.ts"
 
 const definitions: [string[], string, string, string, string, string[]][] = [
@@ -17,7 +18,7 @@ export const derivations: Derivation[] = definitions.map(([premises, conclusion,
   const initial = premises.map(formula => formula + " :PR")
   const solution = [...initial, work].join("\n")
   return {
-    id: `tfl-${index + 1}`, category: "derivations", difficulty: index >= 8 ? "Advanced" : index >= 4 ? "Intermediate" : "Introductory",
+    id: `tfl-${index + 1}`, category: "derivations", system: rutgersProofSystem, difficulty: index >= 8 ? "Advanced" : index >= 4 ? "Intermediate" : "Introductory",
     prompt: "Derive the conclusion from the given premises.", premises, conclusion,
     solution, hint, explanation, concepts,
   }

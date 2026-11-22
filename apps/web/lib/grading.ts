@@ -13,7 +13,7 @@ export function gradeLocally(problem: Problem, answer: Answer | undefined): Grad
   switch (problem.category) {
     case "derivations": {
       if (typeof answer !== "string") return { correct: false, message: "Enter a proof." }
-      const issue = validateProof(answer, problem.premises, problem.conclusion)
+      const issue = validateProof(answer, problem.premises, problem.conclusion, problem.system)
       return issue ? { correct: false, message: "The proof is incomplete or incorrect.", detail: issue.message, line: issue.line } : { correct: true, message: "Correct!" }
     }
     case "symbolization": {

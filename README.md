@@ -42,7 +42,8 @@ scores are stored on the device.
 
 ### Logic and notation
 
-- TFL proofs follow the rules of the pre-Fall 2019 `ZachTFL` system, with
+- Rutgers Problem Set 4 configures `thomasBolducAndZachTFL` (pre-2019
+  Calgary). The current TFL problem bank uses that system, with
   `PR`, `AS`, `R`, `X`, `IP`, the introduction and elimination rules,
   and the derived rules `DS`, `MT`, `DNE`, `DeM`, and `LEM`. The
   checker validates each assertion, the boundaries of cited
@@ -53,14 +54,17 @@ scores are stored on the device.
   assumption before applying `→I` to prove `P → P`.
 - In the proof editor, enter one formula and justification per line
   (`Q :->E 1,3`). Indent the assumption (`P :AS`) to start a subproof.
-  Enter carries the indentation forward. Alt/Option + Right or Left
-  changes it. Tab moves focus. Use `--` at the enclosing indentation
+  Tab inserts four spaces and Enter carries the indentation forward.
+  Alt/Option + Right or Left changes the indentation. Escape then Tab
+  moves focus forward. Use `--` at the enclosing indentation
   between adjacent subproofs.
 - The formula parser accepts Unicode and Calgary keyboard aliases.
   Unary operators bind to the next unit. Parentheses or brackets group
   binary connectives, which share one precedence level. TFL grouping
   must enclose a binary formula. The FOL parser permits redundant
-  grouping and reads open formulas for syntax exercises. It accepts compact predicates such as `Lxy` and simple
+  grouping and reads open formulas for syntax exercises. Exercises that
+  explicitly select `thomasBolducAndZachTFL2019` allow left-grouped
+  conjunction/disjunction chains and use only the basic inference rules. It accepts compact predicates such as `Lxy` and simple
   parenthesized arguments such as `L(x,y)`. The MVP has no function terms.
 - Translation grading compares parsed answers with specific, reviewed
   alternatives. It normalizes bound-variable renaming, identity

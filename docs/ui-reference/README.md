@@ -27,9 +27,9 @@ and the screenshot supplied for this task.
   separator. Practice shows a live proof preview beneath the editor.
   The goal marker explains an incomplete proof, and line markers
   distinguish valid lines, syntax errors, and inference errors.
-  Enter carries indentation forward. The original can enable Tab
-  indentation per activity. The app uses Alt/Option with arrow keys
-  so Tab remains available for navigation.
+  Enter carries indentation forward. Tab inserts four spaces as in
+  the Rutgers activity. Escape then Tab moves focus forward, and
+  Alt/Option with arrow keys also changes indentation.
 - **Symbolization.** The original shows a roughly 400 px monospace input
   with Submit beside it and the English prompt immediately below.
   Classic keeps that order. The key sits above the input. Enter checks

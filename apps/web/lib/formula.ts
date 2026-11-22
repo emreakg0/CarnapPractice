@@ -21,13 +21,14 @@ export const isVariable = (term: string) => /^[s-z](?:_\d+)?$/.test(term)
 
 export class FormulaError extends Error {}
 
-export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): Formula {
+export function parseFormula(source: string, language: "TFL" | "TFL2019" | "FOL" = "FOL"): Formula {
   if (source.length > 2000) throw new FormulaError("Use a formula shorter than 2,000 characters.")
+  const tfl = language !== "FOL"
   const tokens = [...source.matchAll(tokenPattern)].filter(([s]) => s.trim())
   let cursor = 0
   const peek = (offset = 0) => {
     const raw = tokens[cursor + offset]?.[0] ?? ""
-    return aliases.get(raw) ?? (language === "TFL" ? tflAliases.get(raw) : undefined) ?? raw
+    return aliases.get(raw) ?? (tfl ? tflAliases.get(raw) : undefined) ?? raw
   }
   const take = () => { const value = peek(); cursor++; return value }
   const fail = (message: string): never => {
@@ -42,12 +43,18 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
     return take()
   }
   function expression(): Formula {
-    const left = unit()
-    if (!binaries.includes(peek())) return left
-    const op = take() as Binary
-    const right = unit()
-    if (binaries.includes(peek())) fail("Use parentheses to group binary connectives")
-    return { kind: "binary", op, left, right }
+    let result = unit()
+    let prior: Binary | undefined
+    const associative = (op: string) => op === "∧" || op === "∨"
+    while (binaries.includes(peek())) {
+      if (prior && (language !== "TFL2019" || !associative(prior) || !associative(peek()))) {
+        fail("Use parentheses to group binary connectives")
+      }
+      const op = take() as Binary
+      result = { kind: "binary", op, left: result, right: unit() }
+      prior = op
+    }
+    return result
   }
   const startsUnit = (token: string, next: string) =>
     /^([A-Z]|[∀∃¬⊥([])/.test(token) || (isTerm(token) && next === "=")
@@ -57,7 +64,7 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
       take()
       const inside = expression()
       expect(token === "(" ? ")" : "]")
-      if (language === "TFL" && inside.kind !== "binary") fail("Parentheses or brackets must enclose a binary formula")
+      if (tfl && inside.kind !== "binary") fail("Parentheses or brackets must enclose a binary formula")
       return inside
     }
     if (token === "¬") {
@@ -68,7 +75,7 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
       take()
       return { kind: "bottom" }
     }
-    if (token === "⊤" && language === "TFL") {
+    if (token === "⊤" && tfl) {
       take()
       return { kind: "top" }
     }
@@ -84,7 +91,7 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
         return { kind: "identity", left, right: term() }
       }
     }
-    if (/^[A-Z](?:_\d+)?$/.test(token) || (language === "TFL" && /^[ζφψχθγξ](?:_\d+)?$/.test(token))) {
+    if (/^[A-Z](?:_\d+)?$/.test(token) || (tfl && /^[ζφψχθγξ](?:_\d+)?$/.test(token))) {
       take()
       const terms: string[] = []
       if (language === "FOL") {
@@ -97,7 +104,7 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
           expect(")")
         }
       }
-      const name = language === "TFL" ? token.replace(/_0+(?=\d)/, "_").replace(/^([A-Z])_0$/, "$1") : token
+      const name = tfl ? token.replace(/_0+(?=\d)/, "_").replace(/^([A-Z])_0$/, "$1") : token
       return { kind: "atom", name, terms }
     }
     return fail("Expected a formula")

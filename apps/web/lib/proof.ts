@@ -1,6 +1,9 @@
 import { children, formulaKey, parseFormula, printFormula, type Formula } from "./formula.ts"
 
-export const rules = {
+export const rutgersProofSystem = "thomasBolducAndZachTFL"
+export type ProofSystem = typeof rutgersProofSystem | "thomasBolducAndZachTFL2019"
+
+const coreRules = {
   PR: "Given premise", AS: "First line of an indented subproof", R: "One accessible line",
   "∧I": "Two lines, one for each conjunct", "∧E": "One conjunction",
   "∨I": "One disjunct", "∨E": "Disjunction and two case ranges ending in the same result",
@@ -8,10 +11,23 @@ export const rules = {
   "↔I": "Two closed subproof ranges, one proving each direction", "↔E": "Biconditional and either side",
   "¬I": "A range from the unnegated assumption to ⊥", "¬E": "A formula and its negation",
   X: "A line containing ⊥", IP: "A range from the negated conclusion to ⊥",
+} as const
+
+const derivedRules = {
   DS: "Disjunction and negation of one disjunct", MT: "Conditional and negation of its consequent",
   DNE: "A double negation", DeM: "A line matching a De Morgan law",
   LEM: "Two ranges assuming opposites and ending in the same result",
 } as const
+const rules = { ...coreRules, ...derivedRules }
+
+export function rulesFor(system: ProofSystem) {
+  return system === rutgersProofSystem ? rules : coreRules
+}
+
+export function parseProofFormula(source: string, system: ProofSystem) {
+  return parseFormula(source, system === rutgersProofSystem ? "TFL" : "TFL2019")
+}
+
 type Rule = keyof typeof rules
 const ruleAliases = new Map([
   ["&", "∧"], ["/\\", "∧"], ["v", "∨"], ["\\/", "∨"], ["|", "∨"],
@@ -21,14 +37,15 @@ const ruleAliases = new Map([
 const ruleNames = [...Object.keys(rules), ...[...ruleAliases.keys()].flatMap(alias => [alias + "I", alias + "E"])]
   .sort((a, b) => b.length - a.length)
 
-export function proofRows(source: string) {
+export function proofRows(source: string, system: ProofSystem = rutgersProofSystem) {
   return source.split("\n").map(raw => {
     const indent = raw.match(/^ */)?.[0] ?? ""
     const colon = raw.indexOf(":")
     const formula = (colon === -1 ? raw : raw.slice(0, colon)).trim()
     const justification = colon === -1 ? "" : raw.slice(colon + 1)
     const name = ruleNames.find(rule => justification.startsWith(rule)) ?? ""
-    const rule = name.replace(/^(.*)([IE])$/, (_, op, mode) => (ruleAliases.get(op) ?? op) + mode)
+    const canonical = name.replace(/^(.*)([IE])$/, (_, op, mode) => (ruleAliases.get(op) ?? op) + mode)
+    const rule = Object.hasOwn(rulesFor(system), canonical) ? canonical : ""
     const rest = justification.slice(name.length).trimStart()
     // Carnap parses a justification prefix. A consumed comma still requires another citation.
     const refs = rest.match(/^\d+(?:-\d+)?(?:(?:\s*,\s*|\s+)\d+(?:-\d+)?)*/)?.[0] ?? ""
@@ -140,11 +157,11 @@ function lemDependencies(result: Formula, blocks: Range[]) {
   return best
 }
 
-export function validateProof(source: string, premises: readonly string[], conclusion: string): ProofIssue | undefined {
+export function validateProof(source: string, premises: readonly string[], conclusion: string, system: ProofSystem = rutgersProofSystem): ProofIssue | undefined {
   if (source.length > 16000) return { kind: "incomplete", message: "Use a proof shorter than 16,000 characters." }
-  const given = new Set(premises.map(premise => formulaKey(parseFormula(premise, "TFL"))))
-  const target = parseFormula(conclusion, "TFL")
-  const rows = proofRows(source.replace(/\n$/, ""))
+  const given = new Set(premises.map(premise => formulaKey(parseProofFormula(premise, system))))
+  const target = parseProofFormula(conclusion, system)
+  const rows = proofRows(source.replace(/\n$/, ""), system)
   const depths = rows.map(row => row.indent.length)
   const assertions = new Map<number, Assertion>()
   let final: Assertion | undefined
@@ -162,7 +179,7 @@ export function validateProof(source: string, premises: readonly string[], concl
     if (row.badReferences) return issue("Enter a citation after the comma.", "syntax")
     const rule = row.rule as Rule
     let formula: Formula
-    try { formula = parseFormula(row.formula, "TFL") } catch (error) {
+    try { formula = parseProofFormula(row.formula, system) } catch (error) {
       return issue(error instanceof Error ? error.message : "Invalid formula.", "syntax")
     }
     if (usesSchematicLetter(formula)) return issue("Use sentence letters A–Z in proof assertions. Greek letters are schematic.")

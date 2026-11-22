@@ -4,7 +4,7 @@ import { CircleCheck, CircleHelp } from "lucide-react"
 import { useState } from "react"
 import { parseFormula, printFormula } from "@/lib/formula"
 import type { Grade } from "@/lib/grading"
-import { rules, validateProof } from "@/lib/proof"
+import { parseProofFormula, rulesFor, rutgersProofSystem, validateProof } from "@/lib/proof"
 import type { Answer, Derivation, Problem } from "@/lib/problems/types"
 import { FormulaInput, ModelFields, SymbolizationKey, SyntaxChoices, SyntaxReview } from "./exercise-fields"
 import { ProofEditor, ProofPreview, ProofStatus } from "./proof-editor"
@@ -12,7 +12,7 @@ import { useExerciseStyle } from "./settings"
 import { Button } from "./ui/button"
 
 export function starterAnswer(problem: Problem) {
-  return problem.category === "derivations" ? problem.premises.map(formula => `${printFormula(parseFormula(formula, "TFL"))} :PR\n`).join("") : undefined
+  return problem.category === "derivations" ? problem.premises.map(formula => `${printFormula(parseProofFormula(formula, problem.system))} :PR\n`).join("") : undefined
 }
 
 export function Exercise({ problem, number, answer, onChange, onSubmit, exam = false, grade, busy = false, saved = false }: {
@@ -24,7 +24,7 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
   const [reveal, setReveal] = useState(false)
   const modern = style === "modern"
   const proof = typeof answer === "string" ? answer : ""
-  const proofIssue = !exam && problem.category === "derivations" ? validateProof(proof, problem.premises, problem.conclusion) : undefined
+  const proofIssue = !exam && problem.category === "derivations" ? validateProof(proof, problem.premises, problem.conclusion, problem.system) : undefined
   const actions = <div className="exercise-actions">
     <Button type="submit" disabled={busy} className="exercise-submit">{exam ? "Save answer" : "Submit"} <CircleCheck aria-hidden="true" size={16} /></Button>
     {!exam && (problem.category !== "symbolization" || modern) && <Button type="button" disabled={busy} onClick={() => onSubmit(false)} className="exercise-check">
@@ -50,11 +50,11 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
                 label={proofIssue ? "Proof incomplete" : "Proof complete"}
                 detail={proofIssue?.message ?? "This proof establishes the conclusion."} />}
             </div>
-            <ProofEditor modern={modern} value={proof}
+            <ProofEditor system={problem.system} modern={modern} value={proof}
               onChange={onChange} issue={proofIssue} showStatus={!exam} onCheck={() => onSubmit(exam)} />
             {actions}
           </div>
-          {!exam && <ProofPreview source={proof} live issue={proofIssue} />}
+          {!exam && <ProofPreview system={problem.system} source={proof} live issue={proofIssue} />}
         </>}
         {problem.category === "symbolization" && <>
           <SymbolizationKey entries={problem.key} />
@@ -97,12 +97,12 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
 }
 
 export function ProofGoal({ problem }: { problem: Derivation }) {
-  return <span className="math">{problem.premises.map(premise => printFormula(parseFormula(premise, "TFL"))).join(", ")} ⊢ {printFormula(parseFormula(problem.conclusion, "TFL"))}</span>
+  return <span className="math">{problem.premises.map(premise => printFormula(parseProofFormula(premise, problem.system))).join(", ")} ⊢ {printFormula(parseProofFormula(problem.conclusion, problem.system))}</span>
 }
 
 export function Solution({ problem }: { problem: Problem }) {
   return <>
-    {problem.category === "derivations" && <ProofPreview source={problem.solution} />}
+    {problem.category === "derivations" && <ProofPreview system={problem.system} source={problem.solution} />}
     {problem.category === "symbolization" && <p className="math">{printFormula(parseFormula(problem.answers[0]))}</p>}
     {problem.category === "syntax" && <ul className="solution-choices">{problem.correct.map(index => <li key={index} className="math">{problem.options[index]}</li>)}</ul>}
     {problem.category === "interpretations" && <p><strong>{problem.expected ? "True" : "False"}</strong></p>}
@@ -122,9 +122,10 @@ function SyntaxReference({ problem }: { problem: Problem }) {
     </dl>
     {derivation ? <>
       <p>Enter one formula, a colon, and a justification per line, for example <code>Q :→E 1,3</code>.
-        Put the rule immediately after the colon. Start a subproof by indenting its <code>AS</code> line. Use Alt/Option + ← or → to change indentation. Enter keeps the current indentation.</p>
+        Put the rule immediately after the colon. Start a subproof by indenting its <code>AS</code> line. Tab inserts four spaces. Use Alt/Option + ← or → to change indentation. Enter keeps the current indentation. Press Escape, then Tab, to move focus forward.</p>
       <p>Close a subproof by returning to the enclosing indentation. Separate adjacent subproofs with <code>--</code> at that indentation. Cite a range as <code>2-4</code>.</p>
-      <dl className="rule-list">{Object.entries(rules).map(([rule, meaning]) => <div key={rule}><dt>{rule}</dt><dd>{meaning}</dd></div>)}</dl>
+      {problem.system !== rutgersProofSystem && <p>Calgary 2019 allows ungrouped ∧ and ∨ chains, grouped from the left. Use the basic rules listed below.</p>}
+      <dl className="rule-list">{Object.entries(rulesFor(problem.system)).map(([rule, meaning]) => <div key={rule}><dt>{rule}</dt><dd>{meaning}</dd></div>)}</dl>
     </> : <p>Predicate arguments can be compact (<code>Lxy</code>) or comma-separated (<code>L(x,y)</code>). Quantifiers bind the next unit. Group binary connectives with parentheses. {problem.category === "symbolization" && <>In practice, Enter checks your formula. Submit records the attempt.</>}</p>}
   </details>
 }

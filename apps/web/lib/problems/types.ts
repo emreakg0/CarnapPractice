@@ -1,3 +1,4 @@
+import type { ProofSystem } from "../proof.ts"
 import type { Interpretation } from "../interpretation.ts"
 
 export const categories = {
@@ -8,7 +9,7 @@ export const categories = {
 } as const
 export type Category = keyof typeof categories
 type Metadata = { id: string; difficulty: "Introductory" | "Intermediate" | "Advanced"; prompt: string; explanation: string; hint: string; concepts: string[] }
-export type Derivation = Metadata & { category: "derivations"; premises: string[]; conclusion: string; solution: string }
+export type Derivation = Metadata & { category: "derivations"; system: ProofSystem; premises: string[]; conclusion: string; solution: string }
 export type Symbolization = Metadata & { category: "symbolization"; key: Record<string, string>; answers: string[] }
 export type Syntax = Metadata & {
   category: "syntax"; formula?: string; task: "formula" | "sentence" | "free" | "bound" | "main" | "scope"

@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react"
-import { parseFormula, printFormula } from "@/lib/formula"
-import { proofRows, rules, type ProofIssue } from "@/lib/proof"
+import { printFormula } from "@/lib/formula"
+import { parseProofFormula, proofRows, rulesFor, type ProofIssue, type ProofSystem } from "@/lib/proof"
 
-function proofLayout(source: string) {
+function proofLayout(source: string, system: ProofSystem) {
   const scopes: number[] = []
-  return proofRows(source).map(row => {
+  return proofRows(source, system).map(row => {
     const columns = row.indent.replace(/\t/g, "   ").length
     if (row.raw.trim()) {
       while (scopes.length && columns < scopes.at(-1)!) scopes.pop()
@@ -16,10 +16,11 @@ function proofLayout(source: string) {
   })
 }
 
-export function ProofEditor({ value, onChange, modern, issue, showStatus, onCheck }: {
-  value: string; onChange: (value: string) => void; modern: boolean; issue?: ProofIssue; showStatus: boolean; onCheck: () => void
+export function ProofEditor({ system, value, onChange, modern, issue, showStatus, onCheck }: {
+  system: ProofSystem; value: string; onChange: (value: string) => void; modern: boolean; issue?: ProofIssue; showStatus: boolean; onCheck: () => void
 }) {
   const field = useRef<HTMLTextAreaElement>(null)
+  const leaveOnTab = useRef(false)
   const [scroll, setScroll] = useState({ top: 0, left: 0 })
   const [visible, setVisible] = useState<{ height: number; leading: number; padding: number }>()
   useEffect(() => {
@@ -31,7 +32,7 @@ export function ProofEditor({ value, onChange, modern, issue, showStatus, onChec
     observer.observe(input)
     return () => observer.disconnect()
   }, [])
-  const rows = proofLayout(value)
+  const rows = proofLayout(value, system)
   const finalPremise = rows.findIndex(row => row.rule !== "PR") - 1
   const premiseEnd = finalPremise === -2 ? rows.length - 1 : finalPremise
 
@@ -51,7 +52,16 @@ export function ProofEditor({ value, onChange, modern, issue, showStatus, onChec
     const rowStart = start ? value.lastIndexOf("\n", start - 1) + 1 : 0
     const currentLine = value.slice(rowStart, value.indexOf("\n", rowStart) === -1 ? undefined : value.indexOf("\n", rowStart))
     const indent = currentLine.match(/^[ \t]*/)?.[0] ?? ""
-    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    if (event.key === "Escape") {
+      leaveOnTab.current = true
+      return
+    }
+    const leave = leaveOnTab.current
+    leaveOnTab.current = false
+    if (event.key === "Tab" && !leave && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault()
+      replace("    ")
+    } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
       onCheck()
     } else if (event.key === "Enter" && indent) {
@@ -62,8 +72,11 @@ export function ProofEditor({ value, onChange, modern, issue, showStatus, onChec
       const forward = event.key === "ArrowRight"
       const lastBreak = value.indexOf("\n", end)
       const rowEnd = lastBreak === -1 ? value.length : lastBreak
+      const rowNumber = value.slice(0, rowStart).split("\n").length - 1
+      const outerIndent = rows[rowNumber].scopes.filter(depth => depth < indent.length).at(-1) ?? 0
+      const spaces = Math.max(0, indent.length - outerIndent) || 4
       const adjusted = value.slice(rowStart, rowEnd).split("\n").map(row =>
-        forward ? "   " + row : row.replace(/^(?:\t| {1,3})/, "")).join("\n")
+        forward ? "    " + row : row.replace(/^ +/, indentation => indentation.slice(spaces))).join("\n")
       replace(adjusted, rowStart, rowEnd)
       if (start !== end) input.setSelectionRange(rowStart, rowStart + adjusted.length)
       else {
@@ -82,12 +95,12 @@ export function ProofEditor({ value, onChange, modern, issue, showStatus, onChec
           const lineStart = from ? value.lastIndexOf("\n", from - 1) + 1 : 0
           const indent = value.slice(lineStart).match(/^[ \t]*/)?.[0] ?? ""
           const blankLine = !value.slice(lineStart, from).trim() && (!value.slice(from) || value[from] === "\n")
-          if (blankLine) replace(indent + "   ", lineStart, from)
-          else replace("\n" + indent + "   ")
+          if (blankLine) replace(indent + "    ", lineStart, from)
+          else replace("\n" + indent + "    ")
         }}>Indent new assumption</button>
         <label>Insert rule <select value="" onChange={event => { if (event.target.value) replace(event.target.value) }}>
           <option value="">Choose…</option>
-          {Object.entries(rules).map(([rule, description]) => <option key={rule} value={rule}>{rule} · {description}</option>)}
+          {Object.entries(rulesFor(system)).map(([rule, description]) => <option key={rule} value={rule}>{rule} · {description}</option>)}
         </select></label>
       </div>}
       <div className="proof-input-frame">
@@ -109,7 +122,7 @@ export function ProofEditor({ value, onChange, modern, issue, showStatus, onChec
           </div>
         </div>
         <textarea ref={field} value={value} aria-label="Proof editor" aria-describedby="proof-entry-help"
-          onChange={event => onChange(event.target.value)} onKeyDown={keys}
+          onChange={event => onChange(event.target.value)} onKeyDown={keys} onBlur={() => { leaveOnTab.current = false }}
           onScroll={event => setScroll({ top: event.currentTarget.scrollTop, left: event.currentTarget.scrollLeft })}
           spellCheck={false} autoCapitalize="off" autoCorrect="off" wrap="off" maxLength={16000}
           rows={Math.min(18, Math.max(6, rows.length + 1))} />
@@ -128,7 +141,7 @@ export function ProofEditor({ value, onChange, modern, issue, showStatus, onChec
           })}
         </div>}
       </div>
-      <span id="proof-entry-help" className="sr-only">Write one formula and justification per line, separated by a colon. Indent with spaces or Option or Alt plus Right Arrow. Enter keeps indentation. Tab moves to the next control.</span>
+      <span id="proof-entry-help" className="sr-only">Write one formula and justification per line, separated by a colon. Tab inserts four spaces. Enter keeps indentation. To move focus forward, press Escape then Tab.</span>
     </div>
   )
 }
@@ -144,16 +157,16 @@ export function ProofStatus({ className, symbol, label, detail, top }: {
   </span>
 }
 
-export function ProofPreview({ source, live, issue }: { source: string; live?: boolean; issue?: ProofIssue }) {
+export function ProofPreview({ system, source, live, issue }: { system: ProofSystem; source: string; live?: boolean; issue?: ProofIssue }) {
   return <div className={`worked-proof${live ? " live-proof" : ""}`} role="group" aria-label="Rendered proof">
-    {proofLayout(source).map((row, index) => {
+    {proofLayout(source, system).map((row, index) => {
       if (!row.raw.trim()) return null
       let raw = issue?.kind === "syntax" && issue.line === index + 1
       let formula = row.formula
       if (!row.separator) {
-        try { formula = printFormula(parseFormula(formula, "TFL"), !!live) }
+        try { formula = printFormula(parseProofFormula(formula, system), !!live) }
         catch { raw = true }
-        raw ||= !Object.hasOwn(rules, row.rule) || row.badReferences
+        raw ||= !row.rule || row.badReferences
       }
       const depth = row.scopes.length
       return <div className="worked-line" key={index}>
