@@ -1,0 +1,168 @@
+import { expect, test, type Locator, type Page } from "@playwright/test"
+import { byId } from "../lib/problems/bank"
+
+async function openQuestion(page: Page, category: string, id: string) {
+  await page.addInitScript(() => { Math.random = () => 0.5 })
+  await page.goto(`/practice/${category}`)
+  await page.getByLabel("Choose question").selectOption(id)
+  await expect(page.getByRole("form", { name: "Exercise" })).toBeVisible()
+}
+
+async function referenceSnapshot(locator: Locator, name: string) {
+  // Browser font rasterization and native form controls vary by platform.
+  if (process.platform !== "darwin") return
+  const page = locator.page()
+  await locator.scrollIntoViewIfNeeded()
+  const box = (await locator.boundingBox())!
+  const { x, y } = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }))
+  expect(await page.screenshot({
+    clip: { x: box.x + x, y: box.y + y - 14, width: box.width, height: box.height + 14 },
+    animations: "disabled",
+  })).toMatchSnapshot(name)
+}
+
+test("Classic syntax matches the checkbox reference and provides an interactive scope tree", async ({ page }) => {
+  await openQuestion(page, "syntax", "syn-1")
+  const card = page.getByRole("form", { name: "Exercise" })
+  await expect(page.getByLabel("Exercise interface")).toHaveValue("classic")
+  await expect(card.getByText("1 pts")).toBeVisible()
+  await expect(card.getByRole("checkbox")).toHaveCount(5)
+  await expect(card.getByRole("checkbox", { name: "∃xFa" })).toHaveCSS("width", "24px")
+  const choices = card.getByRole("group", { name: "Answer choices" })
+  const submit = card.getByRole("button", { name: "Submit" })
+  expect((await submit.boundingBox())!.y).toBeCloseTo((await choices.boundingBox())!.y + (await choices.boundingBox())!.height, 0)
+  await referenceSnapshot(card, "classic-syntax.png")
+
+  await card.getByRole("checkbox", { name: "FaGb" }).check()
+  await card.getByRole("button", { name: "Check" }).click()
+  await expect(card.getByRole("status")).toContainText("Incorrect selection.")
+  await card.getByRole("checkbox", { name: "FaGb" }).uncheck()
+  await card.getByRole("checkbox", { name: "∃xFa" }).check()
+  await card.getByRole("checkbox", { name: "∃x¬¬∀y(Fx ∧ Gy)" }).check()
+  await submit.click()
+  await expect(card.getByRole("status")).toContainText("Correct!")
+
+  await page.getByLabel("Choose question").selectOption("syn-4")
+  await card.getByRole("checkbox", { name: "Fx → Gy", exact: true }).check()
+  await card.getByRole("button", { name: "Check" }).click()
+  await expect(card.getByRole("button", { name: "∀x", exact: true })).toHaveAttribute("aria-pressed", "true")
+  await expect(card.getByRole("button", { name: "→", exact: true })).toHaveClass("in-scope")
+  await card.getByRole("button", { name: "→", exact: true }).click()
+  await expect(card.getByRole("button", { name: "→", exact: true })).toHaveAttribute("aria-pressed", "true")
+})
+
+test("Classic proof renders line numbers and nested guides, handles the keyboard, and flags bad references", async ({ page }) => {
+  await openQuestion(page, "derivations", "tfl-10")
+  const card = page.getByRole("form", { name: "Exercise" })
+  const input = card.getByRole("textbox", { name: "Proof editor" })
+  await input.focus()
+  await input.press("Alt+ArrowRight")
+  await input.pressSequentially("P :AS")
+  await input.press("Enter")
+  await expect(input).toHaveValue("   P :AS\n   ")
+  await input.press("Alt+ArrowRight")
+  await expect(input).toHaveValue("   P :AS\n      ")
+  await input.press("Alt+ArrowLeft")
+  await expect(input).toHaveValue("   P :AS\n   ")
+  await input.press("Tab")
+  await expect(card.getByRole("button", { name: "Submit" })).toBeFocused()
+
+  const question = byId["tfl-10"]
+  if (question?.category !== "derivations") throw new Error("Missing proof")
+  const solution = question.solution.replaceAll(" | ", " ∨ ").replaceAll(":|", ":∨").replaceAll("->", "→")
+  await input.fill(solution)
+  await expect(card.locator(".proof-numbers > div > div")).toHaveCount(8)
+  await expect(card.locator(".guide-row").nth(1).locator("i")).toHaveCount(2)
+  await expect(card.locator(".guide-row").nth(1).locator(".assumption-guide")).toHaveCSS("border-bottom-width", "1px")
+  await expect(input).toHaveValue(/∨E 1,2-3,5-6/)
+  await input.blur()
+  await referenceSnapshot(card, "classic-proof.png")
+
+  await input.fill(solution.replace("∨I 5", "R 3"))
+  await card.getByRole("button", { name: "Check" }).click()
+  await expect(card.getByRole("status")).toContainText("Line 6: Line 3 is inside a closed or sibling subproof.")
+  await expect(card.locator(".proof-numbers .line-error")).toHaveText("6")
+  await referenceSnapshot(card, "classic-proof-error.png")
+  await input.fill(solution)
+  await card.getByRole("button", { name: "Submit" }).click()
+  await expect(card.getByRole("status")).toContainText("Correct!")
+})
+
+test("symbolization keeps input above the prompt in Classic and accepts the same answer in Modern", async ({ page }) => {
+  await openQuestion(page, "symbolization", "sym-1")
+  const card = page.getByRole("form", { name: "Exercise" })
+  const input = card.getByRole("textbox", { name: "Your formula" })
+  const prompt = card.getByText("Every cat likes at least one cat.", { exact: true })
+  await expect(input).toHaveCSS("font-family", "monospace")
+  expect((await input.boundingBox())!.y).toBeLessThan((await prompt.boundingBox())!.y)
+  await referenceSnapshot(card, "classic-symbolization.png")
+  await input.fill("Ax(Cx ->")
+  await input.press("Enter")
+  await expect(card.getByRole("status")).toContainText("That formula isn’t grammatical.")
+  await referenceSnapshot(card, "classic-symbolization-error.png")
+
+  await page.getByLabel("Exercise interface").selectOption("modern")
+  await expect(input).toHaveValue("Ax(Cx ->")
+  expect((await input.boundingBox())!.y).toBeGreaterThan((await prompt.boundingBox())!.y)
+  await input.fill("∀z(C(z) → ∃w(L(z,w) ∧ C(w)))")
+  await card.getByRole("button", { name: "Submit" }).click()
+  await expect(card.getByRole("status")).toContainText("Correct!")
+  await page.reload()
+  await expect(input).toHaveValue("∀z(C(z) → ∃w(L(z,w) ∧ C(w)))")
+  await expect(page.getByLabel("Exercise interface")).toHaveValue("modern")
+  await page.getByRole("link", { name: "Progress", exact: true }).click()
+  await expect(page.getByText("1/40")).toBeVisible()
+})
+
+test("interpretations render relation data and return witnesses; mobile fits and themes persist", async ({ page }) => {
+  await openQuestion(page, "interpretations", "int-5")
+  const card = page.getByRole("form", { name: "Exercise" })
+  await referenceSnapshot(card, "classic-interpretation.png")
+  await card.getByText("View relation matrix").click()
+  await expect(card.getByRole("table")).toBeVisible()
+  await card.getByRole("radio", { name: "True" }).check()
+  await card.getByRole("button", { name: "Submit" }).click()
+  await expect(card.getByRole("status")).toContainText("Witness")
+  await page.setViewportSize({ width: 360, height: 750 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
+  await page.getByRole("button", { name: "Toggle light and dark theme" }).click()
+  await page.reload()
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark")
+  await expect(card.getByRole("radio", { name: "True" })).toBeChecked()
+})
+
+test("exam hides feedback, preserves drafts on refresh, and grades on finish", async ({ page }) => {
+  await page.addInitScript(() => { Math.random = () => 0.5 })
+  await page.goto("/exam")
+  await page.getByRole("button", { name: "Start exam" }).click()
+  await expect(page.getByRole("timer")).toHaveText(/^(29|30):/)
+  await expect(page.getByRole("button", { name: "Show hint" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Check" })).toHaveCount(0)
+  await page.getByRole("button", { name: "Next" }).click()
+  const input = page.getByRole("textbox", { name: "Your formula" })
+  await input.fill("Ax(Cx -> Ey(Cy & Lxy))")
+  await page.getByRole("button", { name: "Save answer" }).click()
+  await expect(page.getByText("Answer saved.")).toBeVisible()
+  await expect(page.getByText("Correct!", { exact: true })).toHaveCount(0)
+  await page.reload()
+  await expect(input).toHaveValue("Ax(Cx -> Ey(Cy & Lxy))")
+  await page.getByRole("button", { name: "Finish exam" }).click()
+  await page.getByRole("button", { name: "Submit exam" }).click()
+  await expect(page.getByRole("heading", { name: "Exam results" })).toBeVisible()
+  await expect(page.getByText("1/8", { exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Review incorrect answers" })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText("1/8", { exact: true })).toBeVisible()
+})
+
+test("exam expires on wall-clock deadline, including a refresh", async ({ page }) => {
+  const start = new Date("2026-11-21T12:00:00Z")
+  await page.clock.install({ time: start })
+  await page.goto("/exam")
+  await page.getByRole("button", { name: "Start exam" }).click()
+  await expect(page.getByRole("timer")).toBeVisible()
+  await page.clock.fastForward(30 * 60 * 1000 + 5_000)
+  await expect(page.getByRole("heading", { name: "Exam results" })).toBeVisible()
+  await page.reload()
+  await expect(page.getByText("0/8", { exact: true })).toBeVisible()
+})
