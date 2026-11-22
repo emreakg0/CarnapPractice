@@ -1,3 +1,149 @@
+# CarnapPractice
+
+CarnapPractice is a browser-based practice app for Rutgers Intro to Logic
+(01:730:101) Midterm 2. It lives in `apps/web` and uses Next.js App Router,
+TypeScript, Tailwind CSS, and shadcn/ui. The original Carnap project and its
+development instructions are included below under [Carnap](#carnap).
+
+## Run locally
+
+Use Node.js 24 and npm.
+
+```sh
+cd apps/web
+npm install
+npm run dev
+```
+
+Open [localhost:3000](http://localhost:3000) to choose a category. Carnap Classic
+is the default exercise interface. The header lets you switch to Modern or
+change the theme. Both interfaces use the same drafts, question bank, and grader.
+
+## Midterm 2 practice
+
+| Module | Questions | What you can practice |
+| --- | ---: | --- |
+| TFL Derivations | 10 | Numbered Fitch proofs with typed justifications, nested scopes, line citations, range citations, and line-specific feedback |
+| FOL Symbolization | 10 | Translating with predicates, relations, quantifiers, identity, and connectives |
+| FOL Syntax and Scope | 10 | Selecting formulas, sentences, free and bound variables, main operators, and scopes, with interactive syntax trees after checking |
+| FOL Interpretations | 10 | Evaluating sentences against finite models, with witnesses or counterexamples where applicable and a relation matrix for binary predicates |
+
+Practice gives immediate feedback, hints, worked solutions, and retries.
+Check previews the grade. Submit records the practice attempt. The practice
+queue shuffles each category and moves recent successes toward the end.
+The exam draws two questions per category and allows 30 minutes. Answers save
+as you type. Finishing the exam or reaching the deadline unlocks the score,
+category breakdown, and review of incorrect and unanswered questions.
+
+Drafts, practice progress, preferences, and the latest exam live in this
+browser's LocalStorage. A reload resumes the exam using the original
+deadline. This is a self-study exam. Answer keys ship with the app and
+scores are stored on the device.
+
+### Logic and notation
+
+- TFL proofs follow the rules of the pre-Fall 2019 `ZachTFL` system, with
+  `PR`, `AS`, `R`, `X`, `IP`, the introduction and elimination rules,
+  and the derived rules `DS`, `MT`, `DNE`, `DeM`, and `LEM`. The
+  checker validates each assertion, the exact boundaries of cited
+  subproofs, and the accessibility of cited lines. It requires at least
+  two assertions in a cited range. For example, use `R` to reiterate the
+  assumption before applying `→I` to prove `P → P`.
+- In the proof editor, enter one formula and justification per line
+  (`Q :->E 1,3`). Indent the assumption (`P :AS`) to start a subproof.
+  Enter carries the indentation forward. Alt/Option + Right or Left
+  changes it. Tab moves focus. Use `--` at the enclosing indentation
+  between adjacent subproofs.
+- The formula parser accepts Unicode and Calgary keyboard aliases.
+  Unary operators bind to the next unit. Parentheses or brackets group
+  binary connectives, which share one precedence level. The parser
+  permits redundant grouping and reads open formulas for syntax
+  exercises. It accepts compact predicates such as `Lxy` and simple
+  parenthesized arguments such as `L(x,y)`. The MVP has no function terms.
+- Translation grading compares parsed answers with specific, reviewed
+  alternatives. It normalizes bound-variable renaming, identity
+  symmetry, and operand order for conjunction, disjunction, and
+  biconditional. A mathematically equivalent translation outside those
+  patterns can be marked incorrect. The criteria are deliberately
+  narrower than Carnap's first-order translation checker.
+- Syntax questions and models are built from fixed specifications.
+  Their computed results must agree with independently authored answer
+  keys before they enter the bank. Tests exercise every worked proof
+  and accepted translation template. Question content is fixed and can
+  be reviewed in [the problem bank](apps/web/lib/problems).
+
+Rule names, notation, and the nested proof reference were drawn from the
+public Calgary documentation. The worked derivation of disjunction
+commutation adapts the public example with different sentence letters.
+[Calgary derivations](https://carnap.io/srv/doc/forallx-yyc.md)
+[Systems reference](https://carnap.io/srv/doc/systems.md)
+
+### Verification
+
+```sh
+cd apps/web
+npm install
+npm test
+npm run build
+npm run test:e2e
+```
+
+The unit suite runs in Node. Playwright starts the production build on
+port 3217 and tests real submissions and timer expiry. On macOS it uses
+installed Chrome and compares the six checked-in screenshots. On other
+platforms, run `npx playwright install chromium` before the same
+interaction checks. See [the Classic UI reference and comparison](docs/ui-reference/README.md).
+
+## Deploy to Vercel
+
+Connect the existing Git repository to the Vercel project and use these
+project build settings. [Vercel monorepo setup](https://vercel.com/docs/monorepos)
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `apps/web` |
+| Framework Preset | Next.js |
+| Node.js Version | 24.x |
+| Install Command | `npm install` |
+| Build Command | `npm run build` |
+| Output Directory | Next.js default |
+| Environment Variables | None required |
+
+The app-level [Vercel configuration](apps/web/vercel.json) sets the
+framework and commands. The Root Directory is set on the Vercel project.
+Vercel builds only the JavaScript app. The Haskell toolchain is independent.
+
+## Validation architecture and planned work
+
+[ValidationEngine](apps/web/lib/grading.ts) is the contract shared by
+practice and exam. It takes a typed problem and answer and returns a
+grade with optional detail and a proof line number. The current adapter
+is deterministic TypeScript. The contract accepts an asynchronous
+implementation for a future service.
+
+The in-repo reuse candidates are Carnap's
+[TFL rule schemas](Carnap/src/Carnap/Languages/PurePropositional/Logic/ThomasBolducAndZach.hs),
+[Fitch parser and proof-tree builder](Carnap/src/Carnap/Calculi/NaturalDeduction/Parser/Fitch.hs),
+[FOL parser](Carnap/src/Carnap/Languages/PureFirstOrder/Parser.hs),
+[translation checker](Carnap-GHCJS/src/Carnap/GHCJS/Action/Translate.hs), and
+[countermodel checker](Carnap-GHCJS/src/Carnap/GHCJS/Action/CounterModel.hs).
+These source modules guided the MVP rules and exercises. A future Carnap
+adapter can run a separately hosted Haskell service and send structured
+grade requests over HTTPS from Next.js. That service would translate
+problem IDs, proof text, and system selections into the corresponding
+Carnap parser or checker and return the same grade fields. The original
+Yesod server has its own runtime and deployment workflow.
+
+The MVP includes the four modules, both interface styles, both study
+modes, local progress, and automated verification. Planned work includes
+the Haskell validation service, more logic systems, truth tables, truth
+trees, countermodel construction, advanced derivations, and instructor
+and community question authoring.
+
+CarnapPractice builds on the [Carnap project](https://github.com/Carnap/Carnap)
+and its contributors' work. The repository is distributed under the
+[GNU General Public License v3](LICENSE).
+
 # Carnap
 
 Carnap is a free and open-source Haskell framework for creating and exploring
