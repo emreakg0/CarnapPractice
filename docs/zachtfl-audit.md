@@ -3,9 +3,11 @@
 The supplied Rutgers proof screenshot lists `DS`, `MT`, `DNE`, `DeM`,
 and `LEM` alongside the basic rules. The complete list and its order
 match the Calgary `ZachTFL` parser. The corresponding Carnap widget
-system identifier is `thomasBolducAndZachTFL`. The screenshot establishes
-the rule family. The assignment's actual widget attributes, Carnap
-build, and instructor options remain unverified.
+system identifier is `thomasBolducAndZachTFL`. CarnapPractice's TFL
+exercises all use the local TypeScript implementation of that rule set.
+The Rutgers screenshot is evidence for the rule family. This repository
+contains no Rutgers assignment configuration that identifies the
+assignment widget's exact system, runtime build, or instructor options.
 
 This audit compares the workspace with the checked-in Haskell source
 and the public Carnap `ZachTFL` playground. The archived fixture records
@@ -46,11 +48,61 @@ rule and records behavior relevant to compatibility.
 | `MT` | A conditional and the negation of its consequent yield the negation of its antecedent. |
 | `DNE` | One double negation yields its inner formula. |
 | `DeM` | Both De Morgan laws work in either direction and within a context. One instantiation can replace several identical occurrences. Operand swaps and simultaneous distinct instantiations fail. The public engine also accepts an unchanged formula through a constant context. TypeScript now accepts that case. |
-| `LEM` | The standard form cites two ranges assuming opposites and ending in the same result. The original permutes the four boundary sequents. An opposite pair can therefore match the endpoints in some nonstandard ranges. TypeScript now checks those permutations and tracks the remaining dependencies, so a playground sequent such as `Q ⊢ Q` cannot establish `Q` for an exercise that omits `Q` from its premises. |
+| `LEM` | The standard form cites two ranges assuming opposites and ending in the same result. The original permutes the four boundary sequents. An opposite pair can therefore match the endpoints in some nonstandard ranges. TypeScript now checks those permutations and tracks the remaining dependencies, so a playground sequent such as `Q ⊢ Q` cannot establish `Q` for an exercise that omits `Q` from its premises. The replay also covers both orientations of the two cases when both assumptions are used. |
 
 [Haskell rule registrations and aliases](../Carnap/src/Carnap/Languages/PurePropositional/Logic/ThomasBolducAndZach.hs)
 [Haskell inference rule schemas](../Carnap/src/Carnap/Languages/PurePropositional/Logic/Rules.hs)
 [Haskell checker and dependency permutations](../Carnap/src/Carnap/Calculi/NaturalDeduction/Checker.hs)
+
+## Biconditional rules
+
+**`↔I` requires two closed subproof ranges in the selected system.**
+The Haskell parser maps `↔I` and `<->I` to the same four indirect
+inference variants. Each variant applies a global restriction to the
+pairs of assumption and final formula. For `P ↔ Q`, the endpoints
+must be `P` to `Q` and `Q` to `P`. The variants allow either or both
+branches to reach their result without relying on the assumption.
+The cited ranges are still required in those cases.
+
+The public checker rejected this derivation on line 3 with both
+conditionals already established as premises. It also rejected
+direct citations to previously derived conditionals, a mixed
+direct citation and range, and direct citations to the two
+range endings.
+
+```text
+P->Q:PR
+Q->P:PR
+P<->Q:<->I1,2
+```
+
+With the same premises, the public checker accepted this proof and
+accepted the two ranges in either order. Replay also covers
+introduction within an outer subproof and rejection when those
+ranges are cited after the outer scope is closed.
+
+```text
+P->Q:PR
+Q->P:PR
+ P:AS
+ Q:->E1,3
+--
+ Q:AS
+ P:->E2,6
+P<->Q:<->I3-4,6-7
+```
+
+**`↔E` requires two accessible assertions.** The Haskell parser maps
+`↔E` and `<->E` to the two biconditional ponens variants. Given
+`P ↔ Q`, a citation of `P` yields `Q`, and a citation of `Q`
+yields `P`. The public checker accepted both directions and
+reordered citations. It rejected inferring `P → Q` directly,
+even when `P` was supplied as a second citation, and rejected
+inferring `¬Q` from `¬P`. To derive `P → Q`, assume `P`,
+apply `↔E` to get `Q`, then close the range with `→I`.
+
+[Calgary rule registration and global restrictions](../Carnap/src/Carnap/Languages/PurePropositional/Logic/ThomasBolducAndZach.hs)
+[Calgary rule definitions](../Carnap/src/Carnap/Languages/PurePropositional/Logic/Rules.hs)
 
 ## Syntax and subproof findings
 
@@ -90,7 +142,7 @@ rule and records behavior relevant to compatibility.
 ## Verification boundary
 
 - The recorded public-widget cases cover all 20 justification names
-  and accepted and rejected examples across the rule family in 103
+  and accepted and rejected examples across the rule family in 124
   captured proofs.
   Automated replay checks proof acceptance and the distinction
   between syntax and inference errors. The alias test enumerates
@@ -100,7 +152,11 @@ rule and records behavior relevant to compatibility.
   and their dependency sets. The observed matches establish
   compatibility for the recorded cases. Arbitrary schematic
   formulas and every possible dependency permutation remain
-  outside that evidence. The app validates ordinary TFL proof
+  outside that evidence. In particular, the local `LEM` checker
+  prefers a valid pairing with the fewest remaining dependencies.
+  Carnap selects from substitutions produced by its higher-order
+  matcher. Ties between different remaining dependency sets have
+  no exhaustive equivalence check. The app validates ordinary TFL proof
   assertions and reports the first error.
 - Page-level options can change which feedback a Carnap assignment
   shows. Checking exact Rutgers configuration requires the

@@ -108,6 +108,19 @@ test("Classic proof renders line numbers and nested guides, handles the keyboard
   await expect(card.getByRole("status")).toContainText("Correct!")
 })
 
+test("biconditional introduction requires two closed ranges", async ({ page }) => {
+  await openQuestion(page, "derivations", "tfl-7")
+  const card = page.getByRole("form", { name: "Exercise" })
+  const input = card.getByRole("textbox", { name: "Proof editor" })
+  await input.fill("P->Q:PR\nQ->P:PR\nP<->Q:<->I1,2")
+  await card.getByRole("button", { name: "Inference error on line 3" }).focus()
+  await expect(card.getByRole("tooltip")).toContainText("Two closed subproof ranges")
+  const problem = byId["tfl-7"]
+  if (problem?.category !== "derivations") throw new Error("Missing biconditional exercise")
+  await input.fill(problem.solution)
+  await expect(card.getByRole("button", { name: "Proof complete" })).toBeVisible()
+})
+
 test("symbolization keeps input above the prompt in Classic and accepts the same answer in Modern", async ({ page }) => {
   await openQuestion(page, "symbolization", "sym-1")
   const card = page.getByRole("form", { name: "Exercise" })

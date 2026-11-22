@@ -5,7 +5,7 @@ export const rules = {
   "∧I": "Two lines, one for each conjunct", "∧E": "One conjunction",
   "∨I": "One disjunct", "∨E": "Disjunction and two case ranges ending in the same result",
   "→I": "A range from antecedent to consequent", "→E": "Conditional and antecedent",
-  "↔I": "Two ranges proving each side from the other", "↔E": "Biconditional and either side",
+  "↔I": "Two closed subproof ranges, one proving each direction", "↔E": "Biconditional and either side",
   "¬I": "A range from the unnegated assumption to ⊥", "¬E": "A formula and its negation",
   X: "A line containing ⊥", IP: "A range from the negated conclusion to ⊥",
   DS: "Disjunction and negation of one disjunct", MT: "Conditional and negation of its consequent",
@@ -119,16 +119,25 @@ function lemDependencies(result: Formula, blocks: Range[]) {
   const endpoints = blocks.flatMap(block => [block.assumption, block.conclusion])
   const isIdentity = ({ formula, dependencies }: Assertion) => dependencies.size === 1 && dependencies.has(formulaKey(formula))
   // Carnap permutes the four sequents passed by its typed LEM rule.
+  let best: Set<string> | undefined
   for (const [i, positive] of endpoints.entries()) {
     if (!isIdentity(positive)) continue
     for (const [j, negative] of endpoints.entries()) {
       if (i === j || !isIdentity(negative) || !negates(negative.formula, positive.formula)) continue
       const cases = endpoints.filter((_, index) => index !== i && index !== j)
       if (!cases.every(endpoint => equal(endpoint.formula, result))) continue
-      const assumed = [formulaKey(positive.formula), formulaKey(negative.formula)]
-      return new Set(cases.flatMap((endpoint, index) => [...endpoint.dependencies].filter(key => key !== assumed[index])))
+      const positiveKey = formulaKey(positive.formula)
+      const negativeKey = formulaKey(negative.formula)
+      for (const [positiveCase, negativeCase] of [cases, [...cases].reverse()]) {
+        const remaining = new Set([
+          ...[...positiveCase.dependencies].filter(key => key !== positiveKey),
+          ...[...negativeCase.dependencies].filter(key => key !== negativeKey),
+        ])
+        if (!best || remaining.size < best.size) best = remaining
+      }
     }
   }
+  return best
 }
 
 export function validateProof(source: string, premises: readonly string[], conclusion: string): ProofIssue | undefined {

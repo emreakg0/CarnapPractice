@@ -41,7 +41,7 @@ test("ZachTFL justification names and aliases match the Calgary rule parser", ()
 })
 
 test("ZachTFL proof replay agrees with the observed public Carnap widget", () => {
-  assert.equal(zachFixtures.length, 103)
+  assert.equal(zachFixtures.length, 124)
   for (const { id, proof, premises, target, carnapSequent, carnapMarks, openGoal } of zachFixtures) {
     const issue = validateProof(proof, premises, target)
     assert.equal(!issue, carnapSequent !== null && !openGoal, id)
