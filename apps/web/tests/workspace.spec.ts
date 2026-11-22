@@ -146,7 +146,7 @@ test("symbolization keeps input above the prompt in Classic and accepts the same
   await expect(input).toHaveValue("∀z(C(z) → ∃w(L(z,w) ∧ C(w)))")
   await expect(page.getByLabel("Exercise interface")).toHaveValue("modern")
   await page.getByRole("link", { name: "Progress", exact: true }).click()
-  await expect(page.getByText("1/40")).toBeVisible()
+  await expect(page.getByText("1/120")).toBeVisible()
 })
 
 test("interpretations render relation data and return witnesses; mobile fits and themes persist", async ({ page }) => {
@@ -164,6 +164,48 @@ test("interpretations render relation data and return witnesses; mobile fits and
   await page.reload()
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark")
   await expect(card.getByRole("radio", { name: "True" })).toBeChecked()
+})
+
+test("expanded practice appends new questions and preserves saved position, drafts, and completion", async ({ page }) => {
+  const order = Array.from({ length: 10 }, (_, index) => `sym-${index + 1}`)
+  await page.addInitScript(({ order }) => {
+    const sessionKey = "carnap-practice:v1:practice:symbolization"
+    if (!localStorage.getItem(sessionKey)) {
+      localStorage.setItem(sessionKey, JSON.stringify({ order, index: 1, drafts: { "sym-2": "Ex(Mx &", "sym-5": "ExAyAyx" } }))
+      localStorage.setItem("carnap-practice:v1:progress", JSON.stringify({ items: { "sym-1": { attempts: 3, solved: true } }, recent: ["sym-1"] }))
+    }
+  }, { order })
+  await page.goto("/practice/symbolization")
+  const select = page.getByLabel("Choose question")
+  await expect(select.locator("option")).toHaveCount(30)
+  await expect(select).toHaveValue("sym-2")
+  await expect(page.getByLabel("Your formula")).toHaveValue("Ex(Mx &")
+  await expect(select.locator('option[value="sym-1"]')).toHaveText(/Solved/)
+  await page.reload()
+  await expect(select).toHaveValue("sym-2")
+  await select.selectOption("sym-5")
+  await expect(page.getByLabel("Your formula")).toHaveValue("ExAyAyx")
+  await select.selectOption("sym-29")
+  await expect(page.getByText(/Tess has inspected every vehicle/)).toBeVisible()
+})
+
+test("PS8 checkbox interpretations grade the complete selection and persist it", async ({ page }) => {
+  await openQuestion(page, "interpretations", "int-11")
+  const card = page.getByRole("form", { name: "Exercise" })
+  await expect(card.getByText("Select all sentences that are true in this interpretation.")).toBeVisible()
+  await expect(card.getByRole("checkbox")).toHaveCount(4)
+  await expect(card.getByText("{Onyx, Jade, Pearl, Amber}")).toBeVisible()
+  await referenceSnapshot(card, "classic-interpretation-multiple.png")
+  await card.getByRole("checkbox", { name: "Fb" }).check()
+  await card.getByRole("button", { name: "Check" }).click()
+  await expect(card.getByRole("status")).toContainText("Incorrect selection")
+  await expect(card.getByRole("list", { name: "Truth values by statement" })).toContainText("Both names refer to Onyx.")
+  await card.getByRole("checkbox", { name: "a=c" }).check()
+  await card.getByRole("button", { name: "Submit" }).click()
+  await expect(card.getByRole("status")).toContainText("Correct!")
+  await page.reload()
+  await expect(card.getByRole("checkbox", { name: "a=c" })).toBeChecked()
+  await expect(card.getByRole("checkbox", { name: "Fb" })).toBeChecked()
 })
 
 test("exam hides feedback, preserves drafts on refresh, and grades on finish", async ({ page }) => {

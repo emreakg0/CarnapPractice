@@ -6,7 +6,7 @@ import { parseFormula, printFormula } from "@/lib/formula"
 import type { Grade } from "@/lib/grading"
 import { parseProofFormula, rulesFor, rutgersProofSystem, validateProof } from "@/lib/proof"
 import type { Answer, Derivation, Problem } from "@/lib/problems/types"
-import { FormulaInput, ModelFields, SymbolizationKey, SyntaxChoices, SyntaxReview } from "./exercise-fields"
+import { FormulaInput, ModelFields, ModelReview, SymbolizationKey, SyntaxChoices, SyntaxReview } from "./exercise-fields"
 import { ProofEditor, ProofPreview, ProofStatus } from "./proof-editor"
 import { useExerciseStyle } from "./settings"
 import { Button } from "./ui/button"
@@ -67,7 +67,7 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
           {actions}
         </>}
         {problem.category === "interpretations" && <>
-          <ModelFields problem={problem} answer={typeof answer === "boolean" ? answer : undefined} change={onChange} actions={actions} />
+          <ModelFields problem={problem} answer={answer} change={onChange} actions={actions} />
         </>}
       </div>
 
@@ -79,6 +79,7 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
             <p>{problem.explanation}</p>
           </div>}
         </div>
+        {problem.category === "interpretations" && problem.options && grade && <div className="syntax-feedback"><ModelReview problem={problem} /></div>}
         {problem.category === "syntax" && grade && <div className="syntax-feedback"><SyntaxReview problem={problem} /></div>}
       </>}
     </form>
@@ -103,9 +104,9 @@ export function ProofGoal({ problem }: { problem: Derivation }) {
 export function Solution({ problem }: { problem: Problem }) {
   return <>
     {problem.category === "derivations" && <ProofPreview system={problem.system} source={problem.solution} />}
-    {problem.category === "symbolization" && <p className="math">{printFormula(parseFormula(problem.answers[0]))}</p>}
+    {problem.category === "symbolization" && <p className="math">{printFormula(parseFormula(problem.answers[0], problem.system))}</p>}
     {problem.category === "syntax" && <ul className="solution-choices">{problem.correct.map(index => <li key={index} className="math">{problem.options[index]}</li>)}</ul>}
-    {problem.category === "interpretations" && <p><strong>{problem.expected ? "True" : "False"}</strong></p>}
+    {problem.category === "interpretations" && (problem.options ? <ModelReview problem={problem} /> : <p><strong>{problem.expected ? "True" : "False"}</strong></p>)}
     <p>{problem.explanation}</p>
   </>
 }
@@ -117,7 +118,7 @@ function SyntaxReference({ problem }: { problem: Problem }) {
   return <details className="syntax-reference">
     <summary>{derivation ? "Syntax and rules" : "Syntax reference"}</summary>
     <dl className="shortcut-grid">
-      {[...shortcutPairs, ...(!derivation ? [["∀x", "Ax"], ["∃x", "Ex"], ["x = y", "x = y"]] : [])].map(([symbol, keys]) =>
+      {[...shortcutPairs.filter(([symbol]) => symbol !== "⊥" || derivation), ...(!derivation ? [["∀x", "Ax"], ["∃x", "Ex"], ["x = y", "x = y"]] : [])].map(([symbol, keys]) =>
         <div key={symbol}><dt>{symbol}</dt><dd><kbd>{keys}</kbd></dd></div>)}
     </dl>
     {derivation ? <>
@@ -126,6 +127,10 @@ function SyntaxReference({ problem }: { problem: Problem }) {
       <p>Close a subproof by returning to the enclosing indentation. Separate adjacent subproofs with <code>--</code> at that indentation. Cite a range as <code>2-4</code>.</p>
       {problem.system !== rutgersProofSystem && <p>Calgary 2019 allows ungrouped ∧ and ∨ chains, grouped from the left. Use the basic rules listed below.</p>}
       <dl className="rule-list">{Object.entries(rulesFor(problem.system)).map(([rule, meaning]) => <div key={rule}><dt>{rule}</dt><dd>{meaning}</dd></div>)}</dl>
-    </> : <p>Predicate arguments can be compact (<code>Lxy</code>) or comma-separated (<code>L(x,y)</code>). Quantifiers bind the next unit. Group binary connectives with parentheses. {problem.category === "symbolization" && <>In practice, Enter checks your formula. Submit records the attempt.</>}</p>}
+    </> : problem.category === "symbolization" && problem.system === "magnusQL"
+      ? <p>Use compact predicates such as <code>Lxy</code>, variables <code>x</code>–<code>z</code>, and <code>~x=y</code> for nonidentity. Quantifiers bind the next unit. In practice, Enter checks your formula and Submit records the attempt.</p>
+      : (problem.category === "syntax" && problem.notation) || (problem.category === "interpretations" && problem.options)
+      ? <p>Read compact predicates such as <code>Lxy</code> in argument order. A quantifier binds the next unit. Group binary connectives with parentheses. The symbol <code>≠</code> expresses nonidentity.</p>
+      : <p>Predicate arguments can be compact (<code>Lxy</code>) or comma-separated (<code>L(x,y)</code>). Quantifiers bind the next unit. Group binary connectives with parentheses. {problem.category === "symbolization" && <>In practice, Enter checks your formula. Submit records the attempt.</>}</p>}
   </details>
 }

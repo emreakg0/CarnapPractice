@@ -6,14 +6,14 @@ export type Interpretation = {
   predicates: Readonly<Record<string, { arity: number; tuples: readonly (readonly string[])[] }>>
 }
 
-export function evaluateFormula(formula: Formula, model: Interpretation) {
+export function evaluateFormula(formula: Formula, model: Interpretation, variable = isVariable) {
   const { domain, constants, predicates } = model
   if (!domain.length || new Set(domain).size !== domain.length) throw new Error("The domain must be nonempty and contain distinct objects.")
-  if (analyzeVariables(formula).free.length) throw new Error("An interpretation question must use a sentence.")
+  if (analyzeVariables(formula, variable).free.length) throw new Error("An interpretation question must use a sentence.")
   function validate(node: Formula) {
     const terms = node.kind === "atom" ? node.terms : node.kind === "identity" ? [node.left, node.right] : []
     for (const term of terms) {
-      if (!isVariable(term) && !domain.includes(constants[term])) throw new Error(`Missing or invalid referent for ${term}.`)
+      if (!variable(term) && !domain.includes(constants[term])) throw new Error(`Missing or invalid referent for ${term}.`)
     }
     if (node.kind === "atom") {
       const predicate = predicates[node.name]
@@ -27,7 +27,7 @@ export function evaluateFormula(formula: Formula, model: Interpretation) {
   validate(formula)
 
   function evaluate(node: Formula, env: Record<string, string>): { value: boolean; evidence?: string } {
-    const referent = (term: string) => isVariable(term) ? env[term] : constants[term]
+    const referent = (term: string) => variable(term) ? env[term] : constants[term]
     switch (node.kind) {
       case "bottom": return { value: false }
       case "top": return { value: true }

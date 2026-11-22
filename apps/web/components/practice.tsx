@@ -6,7 +6,7 @@ import { Exercise, starterAnswer } from "./exercise"
 import { useStored } from "./storage"
 import { Button } from "./ui/button"
 import { validationEngine, type Grade } from "@/lib/grading"
-import { byId, practiceOrder } from "@/lib/problems/bank"
+import { bank, byId, practiceOrder, progressThrough } from "@/lib/problems/bank"
 import { categories, type Answer, type Category } from "@/lib/problems/types"
 import { emptyProgress, recordAttempt, type Progress } from "@/lib/session"
 
@@ -21,12 +21,19 @@ export function Practice({ category }: { category: Category }) {
   const request = useRef(0)
   const id = session.order[session.index]
   const problem = byId[id]
-  const validOrder = session.order.some(item => byId[item]?.category === category)
+  const categorySize = bank.filter(item => item.category === category).length
+  const needsRefresh = new Set(session.order.filter(item => byId[item]?.category === category)).size < categorySize
 
   useEffect(() => {
-    if (!validOrder) setSession(old => old.order.some(item => byId[item]?.category === category)
-      ? old : { ...old, order: practiceOrder(category, progress.recent), index: 0 })
-  }, [category, progress.recent, setSession, validOrder])
+    if (!needsRefresh) return
+    setSession(previous => {
+      const order = [...new Set(previous.order.filter(item => byId[item]?.category === category))]
+      const missing = progressThrough(category, progress.recent).filter(id => !order.includes(id))
+      if (!missing.length) return previous
+      const current = previous.order[previous.index]
+      return { ...previous, order: [...order, ...missing], index: Math.max(0, order.indexOf(current)) }
+    })
+  }, [category, progress.recent, setSession, needsRefresh])
 
   function navigate(index: number) {
     request.current++
@@ -61,7 +68,7 @@ export function Practice({ category }: { category: Category }) {
       <div className="question-nav">
         <label>Question <select aria-label="Choose question" value={id} onChange={event => navigate(session.order.indexOf(event.target.value))}>
           {session.order.map((item, index) => <option value={item} key={item}>
-            {index + 1} of {session.order.length}{progress.items[item]?.solved ? " · Solved" : ""}
+            {index + 1} of {session.order.length} · {byId[item]?.difficulty}{progress.items[item]?.solved ? " · Solved" : ""}
           </option>)}
         </select></label>
         <div className="action-row">

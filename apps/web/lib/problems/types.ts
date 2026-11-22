@@ -10,11 +10,14 @@ export const categories = {
 export type Category = keyof typeof categories
 type Metadata = { id: string; difficulty: "Introductory" | "Intermediate" | "Advanced"; prompt: string; explanation: string; hint: string; concepts: string[] }
 export type Derivation = Metadata & { category: "derivations"; system: ProofSystem; premises: string[]; conclusion: string; solution: string }
-export type Symbolization = Metadata & { category: "symbolization"; key: Record<string, string>; answers: string[] }
+export type Symbolization = Metadata & { category: "symbolization"; system?: "magnusQL"; key: Record<string, string>; answers: string[] }
 export type Syntax = Metadata & {
-  category: "syntax"; formula?: string; task: "formula" | "sentence" | "free" | "bound" | "main" | "scope"
+  category: "syntax"; notation?: "courseFOL"; formula?: string; task: "formula" | "sentence" | "open" | "free" | "bound" | "main" | "scope"
   options: string[]; correct: number[]; target?: number[]
 }
-export type ModelQuestion = Metadata & { category: "interpretations"; formula: string; model: Interpretation; expected: boolean }
+export type ModelQuestion = Metadata & { category: "interpretations"; model: Interpretation } & (
+  | { formula: string; expected: boolean; options?: never }
+  | { formula?: never; expected?: never; options: string[]; correct: number[]; select: boolean; reasons: string[] }
+)
 export type Problem = Derivation | Symbolization | Syntax | ModelQuestion
 export type Answer = string | number[] | boolean

@@ -3,7 +3,7 @@
 The professor's Problem Set 4 HTML identifies the system as
 `thomasBolducAndZachTFL`, with `fitch` guides, `tabindent render popout`
 options, and the `proofchecker` widget type. This is the pre-2019
-Calgary rule set. All ten TFL exercises in CarnapPractice explicitly
+Calgary rule set. All 30 TFL exercises in CarnapPractice explicitly
 select that system. The guide and widget options govern presentation
 and editing. The selected system supplies the parser and proof rules.
 
@@ -178,8 +178,8 @@ public widget HTML while running Carnap's original browser checker.
 ## Verification boundary
 
 - The recorded public-widget cases cover all 20 justification names
-  and accepted and rejected examples across the rule family in 206
-  captured proofs across both systems. These include all ten current
+  and accepted and rejected examples across the rule family in 226
+  captured proofs across both systems. These include all 30 current
   worked solutions and three alternate solutions. Every bank result
   was checked against the exercise's intended conclusion.
   Automated replay checks proof acceptance and the distinction

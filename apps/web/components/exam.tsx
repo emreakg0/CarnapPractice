@@ -123,7 +123,7 @@ export function ExamWorkspace() {
 
 function describeAnswer(problem: Problem, answer: Answer | undefined) {
   if (!hasAnswer(problem.id, answer)) return "Unanswered"
-  if (Array.isArray(answer) && problem.category === "syntax") return answer.map(index => problem.options[index]).join(", ") || "No choices selected"
+  if (Array.isArray(answer) && "options" in problem && problem.options) return answer.map(index => problem.options?.[index]).join(", ") || "No choices selected"
   return typeof answer === "boolean" ? (answer ? "True" : "False") : String(answer)
 }
 
@@ -151,7 +151,7 @@ function ExamResults({ exam, results }: { exam: Exam; results: Grade[] }) {
         {problem.category === "derivations" && <ProofGoal problem={problem} />}
         {problem.category === "symbolization" && <SymbolizationKey entries={problem.key} />}
         {problem.category === "interpretations" && <ModelData model={problem.model} />}
-        {problem.category === "syntax" && <ul className="solution-choices">{problem.options.map(option => <li key={option}>{option}</li>)}</ul>}
+        {"options" in problem && problem.options && <ul className="solution-choices">{problem.options.map(option => <li key={option}>{option}</li>)}</ul>}
         <p><strong>Your answer</strong></p>
         <pre>{describeAnswer(problem, exam.answers[problem.id])}</pre>
         {grade.detail && <p>{grade.line ? `Line ${grade.line}: ` : ""}{grade.detail}</p>}

@@ -1,12 +1,14 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { analyzeVariables, children, FormulaError, formulaKey, mainOperator, parseFormula, printFormula } from "../lib/formula.ts"
+import { analyzeVariables, children, FormulaError, formulaKey, isMagnusVariable, mainOperator, parseFormula, printFormula } from "../lib/formula.ts"
 import { gradeLocally } from "../lib/grading.ts"
-import { evaluateFormula } from "../lib/interpretation.ts"
+import { evaluateFormula, type Interpretation } from "../lib/interpretation.ts"
 import { parseProofFormula, proofRows, rulesFor, rutgersProofSystem, validateProof, type ProofSystem } from "../lib/proof.ts"
-import { bank, byId, categoryIds, examOrder, practiceOrder } from "../lib/problems/bank.ts"
+import { bank, byId, categoryIds, examOrder, practiceOrder, progressThrough } from "../lib/problems/bank.ts"
 import { syntaxSelection } from "../lib/problems/syntax.ts"
 import { emptyProgress, hasAnswer, recordAttempt } from "../lib/session.ts"
+import magnusFixtures from "./magnusql-fixtures.json" with { type: "json" }
+import { evaluateModelOption } from "../lib/problems/models.ts"
 import zachFixtures from "./zachtfl-fixtures.json" with { type: "json" }
 
 test("Calgary aliases, unary precedence, and explicit grouping", () => {
@@ -41,7 +43,7 @@ test("ZachTFL justification names and aliases match the Calgary rule parser", ()
 })
 
 test("ZachTFL proof replay agrees with the observed public Carnap widget", () => {
-  assert.equal(zachFixtures.length, 206)
+  assert.equal(zachFixtures.length, 226)
   for (const { id, proof, premises, target, carnapSequent, carnapMarks, openGoal, system } of zachFixtures) {
     const issue = validateProof(proof, premises, target, system as ProofSystem | undefined)
     assert.equal(!issue, carnapSequent !== null && !openGoal, id)
@@ -76,6 +78,62 @@ test("exercise metadata controls the proof parser and derived rules", () => {
     assert.equal(item.system, rutgersProofSystem)
     assert.equal(record?.proof, item.solution, item.id)
     assert.equal(formulaKey(parseProofFormula(record!.target, item.system)), formulaKey(parseProofFormula(item.conclusion, item.system)))
+  }
+})
+
+test("new translation templates match original Magnus grammar and their exercise vocabulary", () => {
+  for (const problem of bank) {
+    if (problem.category !== "symbolization" || problem.system !== "magnusQL") continue
+    const observations = magnusFixtures.filter(row => row.id === problem.id)
+    assert.deepEqual(observations.map(row => row.formula), problem.answers)
+    assert.ok(observations.every(row => row.message && !row.message.includes("grammatical")))
+    const { key } = problem
+    for (const answer of problem.answers) {
+      const formula = parseFormula(answer, "magnusQL")
+      assert.equal(analyzeVariables(formula, isMagnusVariable).sentence, true, problem.id)
+      function check(node: ReturnType<typeof parseFormula>) {
+        if (node.kind === "atom") assert.ok(Object.keys(key).some(symbol =>
+          symbol.startsWith(node.name) && symbol.length - node.name.length === node.terms.length), problem.id)
+        const terms = node.kind === "atom" ? node.terms : node.kind === "identity" ? [node.left, node.right] : []
+        for (const term of terms) if (!isMagnusVariable(term)) assert.ok(Object.hasOwn(key, term), problem.id)
+        children(node).forEach(check)
+      }
+      check(formula)
+    }
+  }
+  for (const invalid of ["P", "F(a)", "(Fa)", "(∀xFx)", "∀sFs", "a ≠ b", "⊥"]) {
+    assert.throws(() => parseFormula(invalid, "magnusQL"), FormulaError, invalid)
+  }
+  const formula = parseFormula("Fa & Gb → ∀xRxb", "magnusQL")
+  assert.equal(printFormula(formula), "(Fa ∧ Gb) → ∀xRxb")
+  assert.equal(analyzeVariables(parseFormula("Vv & Fs", "magnusQL"), isMagnusVariable).sentence, true)
+  assert.equal(printFormula(parseFormula("Fa v Gb", "magnusQL")), "Fa ∨ Gb")
+})
+
+test("reviewed alternate translation keys agree across varied finite models", () => {
+  let seed = 381
+  function next(limit: number) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+    return Math.floor(seed / 2 ** 32 * limit)
+  }
+  for (const problem of bank) {
+    if (problem.category !== "symbolization" || !problem.system || problem.answers.length < 2) continue
+    const asts = problem.answers.map(answer => parseFormula(answer, problem.system))
+    for (let trial = 0; trial < 90; trial++) {
+      const domain = ["one", "two", "three"].slice(0, trial % 3 + 1)
+      const constants: Record<string, string> = {}
+      const predicates: Record<string, Interpretation["predicates"][string]> = {}
+      for (const symbol of Object.keys(problem.key)) {
+        if (symbol.length === 1) constants[symbol] = domain[next(domain.length)]
+        else {
+          let tuples: string[][] = [[]]
+          for (let i = 1; i < symbol.length; i++) tuples = tuples.flatMap(prefix => domain.map(object => [...prefix, object]))
+          predicates[symbol[0]] = { arity: symbol.length - 1, tuples: tuples.filter(() => next(2) === 1) }
+        }
+      }
+      const values = asts.map(ast => evaluateFormula(ast, { domain, constants, predicates }, isMagnusVariable).value)
+      assert.equal(new Set(values).size, 1, problem.id)
+    }
   }
 })
 
@@ -176,9 +234,9 @@ test("finite interpretation witnesses, counterexamples, identity, and invalid mo
   assert.equal(gradeLocally(question, false).correct, true)
 })
 
-test("the bank has 40 unique graded problems and generated answers match authored keys", () => {
-  assert.equal(new Set(bank.map(problem => problem.id)).size, 40)
-  for (const category of categoryIds) assert.equal(bank.filter(item => item.category === category).length, 10)
+test("the bank has 120 unique graded problems and generated answers match authored keys", () => {
+  assert.equal(new Set(bank.map(problem => problem.id)).size, 120)
+  for (const category of categoryIds) assert.equal(bank.filter(item => item.category === category).length, 30)
   for (const problem of bank) {
     assert.equal(gradeLocally(problem, undefined).correct, false)
     switch (problem.category) {
@@ -192,20 +250,37 @@ test("the bank has 40 unique graded problems and generated answers match authore
         break
       case "syntax":
         assert.deepEqual(syntaxSelection(problem), problem.correct)
+        if (problem.notation && ["sentence", "open"].includes(problem.task)) {
+          for (const option of problem.options) assert.doesNotThrow(() => parseFormula(option, problem.notation), problem.id)
+        }
         assert.equal(gradeLocally(problem, problem.correct).correct, true, problem.id)
         assert.equal(gradeLocally(problem, [...problem.correct, 100]).correct, false, problem.id)
         break
       case "interpretations":
-        assert.equal(evaluateFormula(parseFormula(problem.formula), problem.model).value, problem.expected)
-        assert.equal(gradeLocally(problem, !problem.expected).correct, false)
+        if (problem.options) {
+          const options = problem.options
+          const computed = options.flatMap((_, index) => evaluateModelOption(problem, index).value === problem.select ? [index] : [])
+          assert.deepEqual(computed, problem.correct, problem.id)
+          assert.ok(computed.length > 0 && computed.length < options.length)
+          assert.equal(gradeLocally(problem, [...computed].reverse()).correct, true, problem.id)
+          assert.equal(gradeLocally(problem, computed.slice(1)).correct, false, problem.id)
+          assert.equal(gradeLocally(problem, options.map((_, index) => index).filter(index => !computed.includes(index))).correct, false, problem.id)
+          assert.equal(gradeLocally(problem, true).correct, false, problem.id)
+        } else {
+          assert.equal(evaluateFormula(parseFormula(problem.formula), problem.model).value, problem.expected)
+          assert.equal(gradeLocally(problem, !problem.expected).correct, false)
+        }
     }
   }
 })
 
 test("question queues defer recent successes and exams are balanced without duplicates", () => {
+  const progression = progressThrough("derivations", [], () => 0.5).map(id => byId[id]?.difficulty)
+  const levels = ["Introductory", "Intermediate", "Advanced"]
+  assert.deepEqual(progression, [...progression].sort((a, b) => levels.indexOf(a!) - levels.indexOf(b!)))
   const recent = ["tfl-1", "tfl-2"]
   const order = practiceOrder("derivations", recent, () => 0.5)
-  assert.equal(new Set(order).size, 10)
+  assert.equal(new Set(order).size, 30)
   assert.deepEqual(order.slice(-2), ["tfl-2", "tfl-1"])
   const exam = examOrder(recent, () => 0.5)
   assert.equal(new Set(exam).size, 8)

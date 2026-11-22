@@ -14,21 +14,32 @@ const aliases = new Map<string, string>([
   ["~", "¬"], ["-", "¬"], ["not", "¬"], ["!?", "⊥"], ["_|_", "⊥"],
 ])
 const tflAliases = new Map([["^", "∧"], ["⊃", "→"], ["only if", "→"], ["<>", "↔"], ["≡", "↔"], ["if and only if", "↔"]])
-const tokenPattern = /\s+|<->|<=>|->|=>|\/\\|\\\/|_\|_|!\?|if and only if|only if|<>|and|not|or|[A-Za-zζφψχθγξ](?:_\d+)?|[\[\](),=∧∨→↔¬∀∃⊥~&|>\-]|./gu
+const tokenPattern = /\s+|<->|<=>|->|=>|\/\\|\\\/|_\|_|!\?|if and only if|only if|<>|!=|and|not|or|[A-Z](?:\^\d+)?(?:_\d+)?|[a-zζφψχθγξ](?:_\d+)?|[\[\](),=∧∨→↔¬∀∃⊥~&|>\-]|./gu
 const binaries: readonly string[] = ["∧", "∨", "→", "↔"]
 const isTerm = (term: string) => /^[a-z](?:_\d+)?$/.test(term)
 export const isVariable = (term: string) => /^[s-z](?:_\d+)?$/.test(term)
 
+export const isMagnusVariable = (term: string) => /^[x-z](?:_\d+)?$/.test(term)
+
 export class FormulaError extends Error {}
 
-export function parseFormula(source: string, language: "TFL" | "TFL2019" | "FOL" = "FOL"): Formula {
+export function parseFormula(source: string, language: "TFL" | "TFL2019" | "FOL" | "magnusQL" | "courseFOL" = "FOL"): Formula {
   if (source.length > 2000) throw new FormulaError("Use a formula shorter than 2,000 characters.")
-  const tfl = language !== "FOL"
+  const tfl = language === "TFL" || language === "TFL2019"
+  const magnus = language === "magnusQL"
+  const course = language === "courseFOL"
+  const variable = magnus || course ? isMagnusVariable : isVariable
   const tokens = [...source.matchAll(tokenPattern)].filter(([s]) => s.trim())
   let cursor = 0
   const peek = (offset = 0) => {
     const raw = tokens[cursor + offset]?.[0] ?? ""
-    return aliases.get(raw) ?? (tfl ? tflAliases.get(raw) : undefined) ?? raw
+    return aliases.get(raw) ?? (magnus && raw === "v" ? "∨" : (tfl || magnus) ? tflAliases.get(raw) : undefined) ?? raw
+  }
+  const compactTerm = () => {
+    const current = tokens[cursor]
+    const prior = tokens[cursor - 1]
+    const adjacent = current && prior && current.index === prior.index + prior[0].length
+    return magnus || course ? adjacent && isTerm(current[0]) : isTerm(peek())
   }
   const take = () => { const value = peek(); cursor++; return value }
   const fail = (message: string): never => {
@@ -39,10 +50,23 @@ export function parseFormula(source: string, language: "TFL" | "TFL2019" | "FOL"
     take()
   }
   const term = () => {
+    if (magnus && tokens[cursor]?.[0] === "v") { cursor++; return "v" }
     if (!isTerm(peek())) fail("Expected a variable or constant")
     return take()
   }
-  function expression(): Formula {
+  function expression(minimum = 0): Formula {
+    if (magnus) {
+      let left = unit()
+      while (binaries.includes(peek())) {
+        const op = peek() as Binary
+        const precedence = op === "∧" || op === "∨" ? 2 : 1
+        if (precedence < minimum) break
+        take()
+        left = { kind: "binary", op, left, right: expression(precedence + 1) }
+        if (precedence === 1 && (peek() === "→" || peek() === "↔")) fail("Group conditional or biconditional chains")
+      }
+      return left
+    }
     let result = unit()
     let prior: Binary | undefined
     const associative = (op: string) => op === "∧" || op === "∨"
@@ -64,14 +88,14 @@ export function parseFormula(source: string, language: "TFL" | "TFL2019" | "FOL"
       take()
       const inside = expression()
       expect(token === "(" ? ")" : "]")
-      if (tfl && inside.kind !== "binary") fail("Parentheses or brackets must enclose a binary formula")
+      if (((tfl || course) && inside.kind !== "binary") || (magnus && inside.kind !== "binary" && inside.kind !== "not")) fail("Parentheses or brackets must enclose a binary formula")
       return inside
     }
     if (token === "¬") {
       take()
       return { kind: "not", body: unit() }
     }
-    if (token === "⊥") {
+    if (token === "⊥" && !magnus && !course) {
       take()
       return { kind: "bottom" }
     }
@@ -79,32 +103,36 @@ export function parseFormula(source: string, language: "TFL" | "TFL2019" | "FOL"
       take()
       return { kind: "top" }
     }
-    if (language === "FOL") {
-      if (token === "∀" || token === "∃" || ((token === "A" || token === "E") && isVariable(peek(1)) && startsUnit(peek(2), peek(3)))) {
+    if (!tfl) {
+      if (token === "∀" || token === "∃" || ((token === "A" || token === "E") && variable(peek(1)) && startsUnit(peek(2), peek(3)))) {
         take()
-        if (!isVariable(peek())) fail("Expected a variable s–z after the quantifier")
+        if (!variable(peek())) fail(magnus || course ? "Expected a variable x–z after the quantifier" : "Expected a variable s–z after the quantifier")
         return { kind: "quantifier", op: token === "A" || token === "∀" ? "∀" : "∃", variable: take(), body: unit() }
       }
-      if (isTerm(token)) {
+      if (isTerm(token) || (magnus && tokens[cursor]?.[0] === "v")) {
         const left = term()
-        expect("=")
-        return { kind: "identity", left, right: term() }
+        const unequal = course && (peek() === "≠" || peek() === "!=")
+        if (unequal) take()
+        else expect("=")
+        const identity: Formula = { kind: "identity", left, right: term() }
+        return unequal ? { kind: "not", body: identity } : identity
       }
     }
-    if (/^[A-Z](?:_\d+)?$/.test(token) || (tfl && /^[ζφψχθγξ](?:_\d+)?$/.test(token))) {
+    if (/^[A-Z](?:_\d+)?$/.test(token) || (magnus && /^[A-Z]\^\d+(?:_\d+)?$/.test(token)) || (tfl && /^[ζφψχθγξ](?:_\d+)?$/.test(token))) {
       take()
       const terms: string[] = []
-      if (language === "FOL") {
-        if (isTerm(peek())) {
-          while (isTerm(peek())) terms.push(term())
-        } else if (peek() === "(" && isTerm(peek(1)) && (peek(2) === "," || peek(2) === ")")) {
+      if (!tfl) {
+        if (compactTerm()) {
+          while (compactTerm()) terms.push(term())
+        } else if (!magnus && !course && peek() === "(" && isTerm(peek(1)) && (peek(2) === "," || peek(2) === ")")) {
           take()
           terms.push(term())
           while (peek() === ",") { take(); terms.push(term()) }
           expect(")")
         }
       }
-      const name = tfl ? token.replace(/_0+(?=\d)/, "_").replace(/^([A-Z])_0$/, "$1") : token
+      if ((magnus || course) && !terms.length) fail("A predicate needs at least one term")
+      const name = magnus ? token.replace(/\^\d+/, "") : tfl ? token.replace(/_0+(?=\d)/, "_").replace(/^([A-Z])_0$/, "$1") : token
       return { kind: "atom", name, terms }
     }
     return fail("Expected a formula")
@@ -138,7 +166,7 @@ export function printFormula(formula: Formula, grouped = false): string {
   }
 }
 
-export function analyzeVariables(formula: Formula) {
+export function analyzeVariables(formula: Formula, variable = isVariable) {
   const free = new Set<string>()
   const bound = new Set<string>()
   function visit(node: Formula, bindings: string[]) {
@@ -147,7 +175,7 @@ export function analyzeVariables(formula: Formula) {
       return
     }
     const terms = node.kind === "atom" ? node.terms : node.kind === "identity" ? [node.left, node.right] : []
-    for (const term of terms.filter(isVariable)) {
+    for (const term of terms.filter(variable)) {
       (bindings.includes(term) ? bound : free).add(term)
     }
     children(node).forEach(child => visit(child, bindings))
@@ -182,9 +210,17 @@ export function formulaKey(formula: Formula, equivalent = false, binders: string
       formula.op, equivalent ? "" : formula.variable, formulaKey(formula.body, equivalent, [...binders, formula.variable]),
     ])
     case "binary": {
-      const operands = [key(formula.left), key(formula.right)]
+      const operands = equivalent && (formula.op === "∧" || formula.op === "∨")
+        ? flattenBinary(formula, formula.op).map(key)
+        : [key(formula.left), key(formula.right)]
       if (equivalent && formula.op !== "→") operands.sort()
       return JSON.stringify([formula.op, ...operands])
     }
   }
+}
+
+function flattenBinary(formula: Formula, operator: "∧" | "∨"): Formula[] {
+  return formula.kind === "binary" && formula.op === operator
+    ? [...flattenBinary(formula.left, operator), ...flattenBinary(formula.right, operator)]
+    : [formula]
 }

@@ -23,14 +23,16 @@ change the theme. Both interfaces use the same drafts, question bank, and grader
 
 | Module | Questions | What you can practice |
 | --- | ---: | --- |
-| TFL Derivations | 10 | Numbered Fitch proofs with typed justifications, nested scopes, line citations, range citations, and a live preview with line-specific feedback |
-| FOL Symbolization | 10 | Translating with predicates, relations, quantifiers, identity, and connectives |
-| FOL Syntax and Scope | 10 | Selecting formulas, sentences, free and bound variables, main operators, and scopes, with interactive syntax trees after checking |
-| FOL Interpretations | 10 | Evaluating sentences against finite models, with witnesses or counterexamples where applicable and a relation matrix for binary predicates |
+| TFL Derivations | 30 | Numbered Fitch proofs with typed justifications, nested scopes, line citations, range citations, and a live preview with line-specific feedback |
+| FOL Symbolization | 30 | Translating with predicates, relations, quantifiers, identity, and connectives |
+| FOL Syntax and Scope | 30 | Selecting formulas, sentences, free and bound variables, main operators, and scopes, with interactive syntax trees after checking |
+| FOL Interpretations | 30 | Selecting true or false sentences in finite models with explicit domains, referents, and extensions |
+
+See the [PS4–8 topic distribution and coverage gaps](docs/midterm-2-bank.md).
 
 Practice gives immediate feedback, hints, worked solutions, and retries.
 Check previews the grade. Submit records the practice attempt. The practice
-queue shuffles each category and moves recent successes toward the end.
+queue groups new sessions by difficulty and delays recent successes within each tier. Existing sessions retain their position and drafts as the bank expands.
 The exam draws two questions per category and allows 30 minutes. Answers save
 as you type. Finishing the exam or reaching the deadline unlocks the score,
 category breakdown, and review of incorrect and unanswered questions.
@@ -96,7 +98,7 @@ npm run test:e2e
 
 The unit suite runs in Node. Playwright starts the production build on
 port 3217 and tests real submissions and timer expiry. On macOS it uses
-installed Chrome and compares the seven checked-in screenshots. On other
+installed Chrome and compares the eight checked-in screenshots. On other
 platforms, run `npx playwright install chromium` before the same
 interaction checks. See [the Classic UI reference and comparison](docs/ui-reference/README.md).
 

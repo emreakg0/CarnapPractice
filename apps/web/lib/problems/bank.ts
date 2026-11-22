@@ -16,6 +16,12 @@ export function practiceOrder(category: Category, recent: readonly string[], ran
   })
 }
 
+export function progressThrough(category: Category, recent: readonly string[], random = Math.random): string[] {
+  const levels = ["Introductory", "Intermediate", "Advanced"]
+  return practiceOrder(category, recent, random).sort((left, right) =>
+    levels.indexOf(byId[left]!.difficulty) - levels.indexOf(byId[right]!.difficulty))
+}
+
 export function examOrder(recent: readonly string[], random = Math.random): string[] {
   const queues = categoryIds.map(category => practiceOrder(category, recent, random))
   return [0, 1].flatMap(index => queues.map(queue => queue[index]))

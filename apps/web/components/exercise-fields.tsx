@@ -2,7 +2,7 @@
 
 import { useRef, type ReactNode } from "react"
 import { children, parseFormula, printFormula } from "@/lib/formula"
-import type { ModelQuestion, Symbolization, Syntax } from "@/lib/problems/types"
+import type { Answer, ModelQuestion, Symbolization, Syntax } from "@/lib/problems/types"
 import { SyntaxTree } from "./syntax-tree"
 
 export function FormulaInput({ value, change, modern, actions, onEnter }: {
@@ -31,31 +31,46 @@ export function FormulaInput({ value, change, modern, actions, onEnter }: {
 export function SyntaxChoices({ problem, answer, change, done }: {
   problem: Syntax; answer: number[]; change: (value: number[]) => void; done: boolean
 }) {
-  const formula = problem.formula ? parseFormula(problem.formula) : undefined
+  const formula = problem.formula ? parseFormula(problem.formula, "notation" in problem ? problem.notation : undefined) : undefined
   return <>
     <div className="classic-prompt">
       {problem.id === "syn-1" ? <>Which of the following strings of symbols are *formulas* of FOL?</> : problem.prompt}
       {formula && <div className="math syntax-prompt-formula">{printFormula(formula)}</div>}
     </div>
+    <CheckboxChoices options={problem.options} answer={answer} change={change} />
+    {done && <span className="sr-only">Syntax tree available below the feedback.</span>}
+  </>
+}
+
+function CheckboxChoices({ options, answer, change }: { options: string[]; answer: number[]; change: (value: number[]) => void }) {
+  return (
     <div className="choice-list" role="group" aria-label="Answer choices">
-      {problem.options.map((option, index) => <label className="choice" key={option}>
+      {options.map((option, index) => <label className="choice" key={option}>
         <input type="checkbox" checked={answer.includes(index)} onChange={event =>
           change(event.target.checked ? [...answer, index] : answer.filter(item => item !== index))} />
         <span className="math">{option}</span>
       </label>)}
     </div>
-    {done && <span className="sr-only">Syntax tree available below the feedback.</span>}
-  </>
+  )
+}
+
+export function ModelReview({ problem }: { problem: ModelQuestion & { options: string[] } }) {
+  return <ul className="solution-choices" aria-label="Truth values by statement">
+    {problem.options.map((formula, index) => <li key={formula}>
+      <span className="math">{formula}</span>{" "}<strong>{problem.correct.includes(index) === problem.select ? "True" : "False"}</strong>
+      <p>{problem.reasons[index]}</p>
+    </li>)}
+  </ul>
 }
 
 export function SyntaxReview({ problem }: { problem: Syntax }) {
-  const options = problem.formula ? [[problem.formula, parseFormula(problem.formula)] as const] : problem.correct.map(index => {
+  const options = problem.formula ? [[problem.formula, parseFormula(problem.formula, "notation" in problem ? problem.notation : undefined)] as const] : problem.correct.map(index => {
     const option = problem.options[index]
-    return [option, parseFormula(option)] as const
+    return [option, parseFormula(option, problem.notation)] as const
   })
   const focused = !!problem.target && problem.formula
   return <>
-    {focused && <p>Scope <span className="math">{printFormula(children(problem.target!.reduce((node, index) => children(node)[index], parseFormula(problem.formula!)))[0])}</span></p>}
+    {focused && <p>Scope <span className="math">{printFormula(children(problem.target!.reduce((node, index) => children(node)[index], parseFormula(problem.formula!, problem.notation)))[0])}</span></p>}
     {options.map(([label, formula]) => <details key={label} open={!!problem.formula}>
       <summary>Syntax tree{options.length > 1 ? ` for ${label}` : ""}</summary>
       <SyntaxTree formula={formula} />
@@ -64,11 +79,16 @@ export function SyntaxReview({ problem }: { problem: Syntax }) {
 }
 
 export function ModelFields({ problem, answer, change, actions }: {
-  problem: ModelQuestion; answer: boolean | undefined; change: (value: boolean) => void; actions: ReactNode
+  problem: ModelQuestion; answer: Answer | undefined; change: (value: Answer) => void; actions: ReactNode
 }) {
   const { domain, predicates } = problem.model
   const relations = Object.entries(predicates).filter(([, predicate]) => predicate.arity === 2)
   return <>
+    {problem.options ? <>
+      <div className="classic-prompt">{problem.prompt}</div>
+      <div className="model-givens"><ModelData model={problem.model} /></div>
+      <CheckboxChoices options={problem.options} answer={Array.isArray(answer) ? answer : []} change={change} />
+    </> : <>
     <div className="classic-prompt">
       <span className="math">{printFormula(parseFormula(problem.formula))}</span>
     </div>
@@ -81,6 +101,7 @@ export function ModelFields({ problem, answer, change, actions }: {
         </label>)}
       </fieldset>
     </div>
+    </>}
     {actions}
     {relations.length > 0 && <details className="model-visual">
       <summary>View relation matrix</summary>

@@ -16,7 +16,7 @@ and the screenshot supplied for this task.
 | TFL derivation | [Public Fitch playground](original-proof.png) | [Nested subproofs](../../apps/web/ui-snapshots/darwin/classic-proof.png), [invalid line reference](../../apps/web/ui-snapshots/darwin/classic-proof-error.png), [syntax error](../../apps/web/ui-snapshots/darwin/classic-proof-syntax.png) |
 | FOL symbolization | [Public FOL translation widget](original-symbolization.png) | [Formula entry](../../apps/web/ui-snapshots/darwin/classic-symbolization.png), [grammatical error](../../apps/web/ui-snapshots/darwin/classic-symbolization-error.png) |
 | FOL syntax and scope | [Supplied checkbox question](primary-syntax.png), [public syntax-tree example](original-syntax.png) | [Classic checkbox question](../../apps/web/ui-snapshots/darwin/classic-syntax.png) |
-| FOL interpretation | [Public model-entry widget](original-model.png) | [Given interpretation with truth choices](../../apps/web/ui-snapshots/darwin/classic-interpretation.png) |
+| FOL interpretation | [Public model-entry widget](original-model.png) | [Original true/false format](../../apps/web/ui-snapshots/darwin/classic-interpretation.png), [Set 8-style multiple selection](../../apps/web/ui-snapshots/darwin/classic-interpretation-multiple.png) |
 
 ## What the comparison covers
 
@@ -46,7 +46,7 @@ and the screenshot supplied for this task.
 - **Interpretations.** The public widget shows the formula above stacked
   domain and predicate fields. It asks for a countermodel. This exercise
   supplies a fixed interpretation in similarly placed read-only fields
-  and asks for a truth value. Binary relations can also be viewed in a
+  and asks for a truth value or for all true or false sentences in a list. Binary relations can also be viewed in a
   table. Witness or counterexample feedback appears under the card controls.
 - **Shared presentation.** Classic keeps the plain system type, thin
   blue-gray borders, and small square action buttons. Labels and button
