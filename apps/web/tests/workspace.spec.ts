@@ -65,6 +65,9 @@ test("Classic proof renders line numbers and nested guides, handles the keyboard
   await input.press("Alt+ArrowLeft")
   await expect(input).toHaveValue("   P :AS\n   ")
   await input.press("Tab")
+  await expect(card.getByRole("button", { name: "Syntax error on line 2" })).toBeFocused()
+  await input.fill("   P :AS")
+  await input.press("Tab")
   await expect(card.getByRole("button", { name: "Submit" })).toBeFocused()
 
   const preview = card.getByRole("group", { name: "Rendered proof" })

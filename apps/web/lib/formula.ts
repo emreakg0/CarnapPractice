@@ -3,6 +3,7 @@ export type Formula =
   | { kind: "atom"; name: string; terms: string[] }
   | { kind: "identity"; left: string; right: string }
   | { kind: "bottom" }
+  | { kind: "top" }
   | { kind: "not"; body: Formula }
   | { kind: "binary"; op: Binary; left: Formula; right: Formula }
   | { kind: "quantifier"; op: "∀" | "∃"; variable: string; body: Formula }
@@ -12,7 +13,8 @@ const aliases = new Map<string, string>([
   ["/\\", "∧"], ["&", "∧"], ["and", "∧"], ["\\/", "∨"], ["|", "∨"], ["or", "∨"],
   ["~", "¬"], ["-", "¬"], ["not", "¬"], ["!?", "⊥"], ["_|_", "⊥"],
 ])
-const tokenPattern = /\s+|<->|<=>|->|=>|\/\\|\\\/|_\|_|!\?|and|not|or|[A-Za-z](?:_\d+)?|[\[\](),=∧∨→↔¬∀∃⊥~&|>\-]|./gu
+const tflAliases = new Map([["^", "∧"], ["⊃", "→"], ["only if", "→"], ["<>", "↔"], ["≡", "↔"], ["if and only if", "↔"]])
+const tokenPattern = /\s+|<->|<=>|->|=>|\/\\|\\\/|_\|_|!\?|if and only if|only if|<>|and|not|or|[A-Za-zζφψχθγξ](?:_\d+)?|[\[\](),=∧∨→↔¬∀∃⊥~&|>\-]|./gu
 const binaries: readonly string[] = ["∧", "∨", "→", "↔"]
 const isTerm = (term: string) => /^[a-z](?:_\d+)?$/.test(term)
 export const isVariable = (term: string) => /^[s-z](?:_\d+)?$/.test(term)
@@ -25,7 +27,7 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
   let cursor = 0
   const peek = (offset = 0) => {
     const raw = tokens[cursor + offset]?.[0] ?? ""
-    return aliases.get(raw) ?? raw
+    return aliases.get(raw) ?? (language === "TFL" ? tflAliases.get(raw) : undefined) ?? raw
   }
   const take = () => { const value = peek(); cursor++; return value }
   const fail = (message: string): never => {
@@ -55,6 +57,7 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
       take()
       const inside = expression()
       expect(token === "(" ? ")" : "]")
+      if (language === "TFL" && inside.kind !== "binary") fail("Parentheses or brackets must enclose a binary formula")
       return inside
     }
     if (token === "¬") {
@@ -64,6 +67,10 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
     if (token === "⊥") {
       take()
       return { kind: "bottom" }
+    }
+    if (token === "⊤" && language === "TFL") {
+      take()
+      return { kind: "top" }
     }
     if (language === "FOL") {
       if (token === "∀" || token === "∃" || ((token === "A" || token === "E") && isVariable(peek(1)) && startsUnit(peek(2), peek(3)))) {
@@ -77,7 +84,7 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
         return { kind: "identity", left, right: term() }
       }
     }
-    if (/^[A-Z](?:_\d+)?$/.test(token)) {
+    if (/^[A-Z](?:_\d+)?$/.test(token) || (language === "TFL" && /^[ζφψχθγξ](?:_\d+)?$/.test(token))) {
       take()
       const terms: string[] = []
       if (language === "FOL") {
@@ -90,7 +97,8 @@ export function parseFormula(source: string, language: "TFL" | "FOL" = "FOL"): F
           expect(")")
         }
       }
-      return { kind: "atom", name: token, terms }
+      const name = language === "TFL" ? token.replace(/_0+(?=\d)/, "_").replace(/^([A-Z])_0$/, "$1") : token
+      return { kind: "atom", name, terms }
     }
     return fail("Expected a formula")
   }
@@ -113,6 +121,7 @@ export function printFormula(formula: Formula, grouped = false): string {
     case "atom": return formula.name + (formula.terms.some(term => term.includes("_")) ? `(${formula.terms.join(",")})` : formula.terms.join(""))
     case "identity": return `${formula.left} = ${formula.right}`
     case "bottom": return "⊥"
+    case "top": return "⊤"
     case "not": return "¬" + printFormula(formula.body, true)
     case "quantifier": return formula.op + formula.variable + printFormula(formula.body, true)
     case "binary": {
@@ -160,6 +169,7 @@ export function formulaKey(formula: Formula, equivalent = false, binders: string
       return JSON.stringify(["=", ...(equivalent ? terms.sort() : terms)])
     }
     case "bottom": return "⊥"
+    case "top": return "⊤"
     case "not": return JSON.stringify(["¬", key(formula.body)])
     case "quantifier": return JSON.stringify([
       formula.op, equivalent ? "" : formula.variable, formulaKey(formula.body, equivalent, [...binders, formula.variable]),

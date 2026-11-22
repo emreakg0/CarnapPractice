@@ -122,7 +122,7 @@ function SyntaxReference({ problem }: { problem: Problem }) {
     </dl>
     {derivation ? <>
       <p>Enter one formula, a colon, and a justification per line, for example <code>Q :→E 1,3</code>.
-        Start a subproof by indenting its <code>AS</code> line. Use Alt/Option + ← or → to change indentation. Enter keeps the current indentation.</p>
+        Put the rule immediately after the colon. Start a subproof by indenting its <code>AS</code> line. Use Alt/Option + ← or → to change indentation. Enter keeps the current indentation.</p>
       <p>Close a subproof by returning to the enclosing indentation. Separate adjacent subproofs with <code>--</code> at that indentation. Cite a range as <code>2-4</code>.</p>
       <dl className="rule-list">{Object.entries(rules).map(([rule, meaning]) => <div key={rule}><dt>{rule}</dt><dd>{meaning}</dd></div>)}</dl>
     </> : <p>Predicate arguments can be compact (<code>Lxy</code>) or comma-separated (<code>L(x,y)</code>). Quantifiers bind the next unit. Group binary connectives with parentheses. {problem.category === "symbolization" && <>In practice, Enter checks your formula. Submit records the attempt.</>}</p>}

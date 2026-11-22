@@ -30,6 +30,7 @@ export function evaluateFormula(formula: Formula, model: Interpretation) {
     const referent = (term: string) => isVariable(term) ? env[term] : constants[term]
     switch (node.kind) {
       case "bottom": return { value: false }
+      case "top": return { value: true }
       case "identity": return { value: referent(node.left) === referent(node.right) }
       case "atom": return {
         value: predicates[node.name].tuples.some(tuple => node.terms.every((term, index) => referent(term) === tuple[index])),

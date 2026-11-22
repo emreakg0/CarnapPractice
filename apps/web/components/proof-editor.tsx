@@ -116,7 +116,7 @@ export function ProofEditor({ value, onChange, modern, issue, showStatus, onChec
         {showStatus && <div className="proof-line-statuses">
           {rows.map((row, index) => {
             const line = index + 1
-            if (!row.raw.trim() || row.separator || (issue?.line && line > issue.line)) return null
+            if ((!row.raw.trim() && issue?.line !== line) || row.separator || (issue?.line && line > issue.line)) return null
             const offset = visible ? visible.padding + index * visible.leading - scroll.top : undefined
             if (visible && offset !== undefined && (offset < 0 || offset + visible.leading > visible.height)) return null
             const top = `calc(var(--proof-pad) + ${index} * var(--proof-leading) - ${scroll.top}px)`
@@ -153,7 +153,7 @@ export function ProofPreview({ source, live, issue }: { source: string; live?: b
       if (!row.separator) {
         try { formula = printFormula(parseFormula(formula, "TFL"), !!live) }
         catch { raw = true }
-        raw ||= !Object.hasOwn(rules, row.rule) || row.extra.length > 0
+        raw ||= !Object.hasOwn(rules, row.rule) || row.badReferences
       }
       const depth = row.scopes.length
       return <div className="worked-line" key={index}>

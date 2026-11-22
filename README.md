@@ -45,8 +45,10 @@ scores are stored on the device.
 - TFL proofs follow the rules of the pre-Fall 2019 `ZachTFL` system, with
   `PR`, `AS`, `R`, `X`, `IP`, the introduction and elimination rules,
   and the derived rules `DS`, `MT`, `DNE`, `DeM`, and `LEM`. The
-  checker validates each assertion, the exact boundaries of cited
-  subproofs, and the accessibility of cited lines. It requires at least
+  checker validates each assertion, the boundaries of cited
+  subproofs, and the accessibility of cited lines. See the
+  [ZachTFL audit](docs/zachtfl-audit.md) for the rule comparison,
+  recorded Carnap fixtures, and verification limits. It requires at least
   two assertions in a cited range. For example, use `R` to reiterate the
   assumption before applying `→I` to prove `P → P`.
 - In the proof editor, enter one formula and justification per line
@@ -56,9 +58,9 @@ scores are stored on the device.
   between adjacent subproofs.
 - The formula parser accepts Unicode and Calgary keyboard aliases.
   Unary operators bind to the next unit. Parentheses or brackets group
-  binary connectives, which share one precedence level. The parser
-  permits redundant grouping and reads open formulas for syntax
-  exercises. It accepts compact predicates such as `Lxy` and simple
+  binary connectives, which share one precedence level. TFL grouping
+  must enclose a binary formula. The FOL parser permits redundant
+  grouping and reads open formulas for syntax exercises. It accepts compact predicates such as `Lxy` and simple
   parenthesized arguments such as `L(x,y)`. The MVP has no function terms.
 - Translation grading compares parsed answers with specific, reviewed
   alternatives. It normalizes bound-variable renaming, identity

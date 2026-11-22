@@ -3,10 +3,11 @@ import { test } from "node:test"
 import { analyzeVariables, children, FormulaError, formulaKey, mainOperator, parseFormula, printFormula } from "../lib/formula.ts"
 import { gradeLocally } from "../lib/grading.ts"
 import { evaluateFormula } from "../lib/interpretation.ts"
-import { validateProof } from "../lib/proof.ts"
+import { proofRows, validateProof } from "../lib/proof.ts"
 import { bank, byId, categoryIds, examOrder, practiceOrder } from "../lib/problems/bank.ts"
 import { syntaxSelection } from "../lib/problems/syntax.ts"
 import { emptyProgress, hasAnswer, recordAttempt } from "../lib/session.ts"
+import zachFixtures from "./zachtfl-fixtures.json" with { type: "json" }
 
 test("Calgary aliases, unary precedence, and explicit grouping", () => {
   const parse = (source: string) => parseFormula(source, "TFL")
@@ -16,6 +17,40 @@ test("Calgary aliases, unary precedence, and explicit grouping", () => {
   assert.equal(printFormula(parse("P and not Q")), "P ∧ ¬Q")
   for (const invalid of ["P & Q -> R", "P | Q | R", "(P -> Q]", "P Q", "AxFx", "P&", "P @ Q"]) {
     assert.throws(() => parse(invalid), FormulaError, invalid)
+  }
+})
+
+test("ZachTFL justification names and aliases match the Calgary rule parser", () => {
+  const operators = {
+    "∧": ["∧", "&", "/\\"], "∨": ["∨", "v", "|", "\\/"], "→": ["→", "->", "=>", ">"],
+    "↔": ["↔", "<->"], "¬": ["¬", "~", "-"],
+  }
+  for (const [symbol, aliases] of Object.entries(operators)) {
+    for (const alias of aliases) for (const suffix of ["I", "E"]) {
+      const [row] = proofRows(`P:${alias}${suffix}1`)
+      assert.equal(row.rule, symbol + suffix)
+      assert.equal(row.refs, "1")
+    }
+  }
+  for (const name of ["AS", "PR", "R", "X", "IP", "DS", "MT", "DNE", "LEM", "DeM"]) {
+    assert.equal(proofRows(`P:${name}`)[0].rule, name)
+  }
+  for (const unsupported of ["<=>I", "andI", "^I", "A/assumption", "dem", " E", " PR"]) {
+    assert.equal(proofRows(`P:${unsupported}`)[0].rule, "")
+  }
+})
+
+test("ZachTFL proof replay agrees with the observed public Carnap widget", () => {
+  assert.equal(zachFixtures.length, 103)
+  for (const { id, proof, premises, target, carnapSequent, carnapMarks, openGoal } of zachFixtures) {
+    const issue = validateProof(proof, premises, target)
+    assert.equal(!issue, carnapSequent !== null && !openGoal, id)
+    if (openGoal) {
+      assert.match(issue?.message ?? "", /assumption outside the given premises/, id)
+      assert.equal(validateProof(proof, [...premises, "Q"], target), undefined, id)
+    } else if (!carnapSequent) {
+      assert.equal(issue?.kind, carnapMarks.match(/[⚠?✗]/u)?.[0] === "⚠" ? "syntax" : "inference", id)
+    }
   }
 })
 
@@ -66,7 +101,7 @@ test("all derived rules are checked for their actual inference patterns", () => 
     assert.equal(validateProof(start + line, premises, target), undefined, line)
     assert.equal(validateProof(start + invalid, premises, target)?.line, premises.length + 1)
   }
-  assert.equal(validateProof("(~(P & Q)) -> R :PR\n(~P | ~Q) -> R :DeM 1", ["(~(P & Q)) -> R"], "(~P | ~Q) -> R"), undefined)
+  assert.equal(validateProof("~(P & Q) -> R :PR\n(~P | ~Q) -> R :DeM 1", ["~(P & Q) -> R"], "(~P | ~Q) -> R"), undefined)
   const lem = "Q :PR\n   P :AS\n   Q :R 1\n--\n   ~P :AS\n   Q :R 1\nQ :LEM 2-3,5-6"
   assert.equal(validateProof(lem, ["Q"], "Q"), undefined)
   assert.match(validateProof(lem.replace("~P :AS", "R :AS"), ["Q"], "Q")?.message ?? "", /LEM/)
@@ -94,7 +129,7 @@ test("Fitch rejects bad premises, future or inaccessible lines, and malformed ra
   assert.match(validateProof(nested.solution.replace("∨I", "|I").replace("   --", "      --"), [], nested.conclusion)?.message ?? "", /Indent/)
   assert.match(validateProof(nested.solution.replace("Q | P :|I 5", "Q | P :R 3"), [], nested.conclusion)?.message ?? "", /closed or sibling/)
   assert.match(validateProof(nested.solution.replace("2-3,5-6", "2-3,2-3"), [], nested.conclusion)?.message ?? "", /does not justify/)
-  assert.match(validateProof(nested.solution.replace("1-7", "2-3"), [], nested.conclusion)?.message ?? "", /directly inside/)
+  assert.match(validateProof(nested.solution.replace("1-7", "2-3"), [], nested.conclusion)?.message ?? "", /accessible from this line/)
 })
 
 test("finite interpretation witnesses, counterexamples, identity, and invalid models", () => {
