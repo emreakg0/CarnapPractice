@@ -85,7 +85,15 @@ test("new translation templates match original Magnus grammar and their exercise
   for (const problem of bank) {
     if (problem.category !== "symbolization" || problem.system !== "magnusQL") continue
     const observations = magnusFixtures.filter(row => row.id === problem.id)
-    assert.deepEqual(observations.map(row => row.formula), problem.answers)
+    // The recorded Carnap fixtures retain the original predicate letters used
+    // when they were captured. The practice bank now avoids unary "Ax", which
+    // can be confused with Carnap's "Ax" universal-quantifier alias.
+    const historicalAnswers = problem.id === "sym-12"
+      ? ["Ag -> (Th & Tg)"]
+      : problem.id === "sym-18"
+        ? ["~Ex((Ax & Rxa) & ~Rxb)", "Ax((Ax & Rxa) -> Rxb)"]
+        : problem.answers
+    assert.deepEqual(observations.map(row => row.formula), historicalAnswers)
     assert.ok(observations.every(row => row.message && !row.message.includes("grammatical")))
     const { key } = problem
     for (const answer of problem.answers) {
@@ -108,6 +116,24 @@ test("new translation templates match original Magnus grammar and their exercise
   assert.equal(printFormula(formula), "(Fa ∧ Gb) → ∀xRxb")
   assert.equal(analyzeVariables(parseFormula("Vv & Fs", "magnusQL"), isMagnusVariable).sentence, true)
   assert.equal(printFormula(parseFormula("Fa v Gb", "magnusQL")), "Fa ∨ Gb")
+})
+
+test("unary predicate keys avoid the universal quantifier alias Ax", () => {
+  const authorized = byId["sym-12"]
+  const apprentice = byId["sym-18"]
+  if (authorized?.category !== "symbolization" || apprentice?.category !== "symbolization") {
+    assert.fail("Missing symbolization questions")
+  }
+  assert.equal(authorized.key.Ux, "x is authorized")
+  assert.equal(Object.hasOwn(authorized.key, "Ax"), false)
+  assert.equal(gradeLocally(authorized, "Ug -> (Th & Tg)").correct, true)
+  assert.equal(gradeLocally(authorized, "Ag -> (Th & Tg)").correct, false)
+
+  assert.equal(apprentice.key.Px, "x is an apprentice")
+  assert.equal(Object.hasOwn(apprentice.key, "Ax"), false)
+  assert.equal(gradeLocally(apprentice, "~Ex((Px & Rxa) & ~Rxb)").correct, true)
+  assert.equal(gradeLocally(apprentice, "Ax((Px & Rxa) -> Rxb)").correct, true)
+  assert.equal(gradeLocally(apprentice, "~Ex((Ax & Rxa) & ~Rxb)").correct, false)
 })
 
 test("reviewed alternate translation keys agree across varied finite models", () => {
