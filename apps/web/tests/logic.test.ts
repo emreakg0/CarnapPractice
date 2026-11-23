@@ -88,11 +88,13 @@ test("new translation templates match original Magnus grammar and their exercise
     // The recorded Carnap fixtures retain the original predicate letters used
     // when they were captured. The practice bank now avoids unary "Ax", which
     // can be confused with Carnap's "Ax" universal-quantifier alias.
-    const historicalAnswers = problem.id === "sym-12"
-      ? ["Ag -> (Th & Tg)"]
-      : problem.id === "sym-18"
-        ? ["~Ex((Ax & Rxa) & ~Rxb)", "Ax((Ax & Rxa) -> Rxb)"]
-        : problem.answers
+    const historicalAnswersById: Record<string, string[]> = {
+      "sym-12": ["Ag -> (Th & Tg)"],
+      "sym-18": ["~Ex((Ax & Rxa) & ~Rxb)", "Ax((Ax & Rxa) -> Rxb)"],
+      "sym-20": ["Ax(Rx -> Ey(My & (Axy & ~Wxy)))"],
+      "sym-24": ["Ax(Ex -> Ey(My & Ayx)) -> Ez(Mz & Ax(Ex -> Azx))"],
+    }
+    const historicalAnswers = historicalAnswersById[problem.id] ?? problem.answers
     assert.deepEqual(observations.map(row => row.formula), historicalAnswers)
     assert.ok(observations.every(row => row.message && !row.message.includes("grammatical")))
     const { key } = problem
@@ -134,6 +136,29 @@ test("unary predicate keys avoid the universal quantifier alias Ax", () => {
   assert.equal(gradeLocally(apprentice, "~Ex((Px & Rxa) & ~Rxb)").correct, true)
   assert.equal(gradeLocally(apprentice, "Ax((Px & Rxa) -> Rxb)").correct, true)
   assert.equal(gradeLocally(apprentice, "~Ex((Ax & Rxa) & ~Rxb)").correct, false)
+})
+
+test("symbolization vocabulary never uses A as a predicate letter", () => {
+  for (const problem of bank) {
+    if (problem.category !== "symbolization") continue
+    for (const symbol of Object.keys(problem.key)) {
+      assert.ok(!/^A[a-z]/.test(symbol), `${problem.id} uses a predicate beginning with A: ${symbol}`)
+    }
+  }
+
+  const checks = [
+    ["sym-4", "Dxy", "AxDnx", "AxAnx"],
+    ["sym-5", "Dxy", "ExAyDyx", "ExAyAyx"],
+    ["sym-20", "Pxy", "Ax(Rx -> Ey(My & (Pxy & ~Wxy)))", "Ax(Rx -> Ey(My & (Axy & ~Wxy)))"],
+    ["sym-24", "Txy", "Ax(Ex -> Ey(My & Tyx)) -> Ez(Mz & Ax(Ex -> Tzx))", "Ax(Ex -> Ey(My & Ayx)) -> Ez(Mz & Ax(Ex -> Azx))"],
+  ] as const
+  for (const [id, symbol, updated, old] of checks) {
+    const problem = byId[id]
+    if (problem?.category !== "symbolization") assert.fail(`Missing symbolization ${id}`)
+    assert.ok(Object.hasOwn(problem.key, symbol), id)
+    assert.equal(gradeLocally(problem, updated).correct, true, id)
+    assert.equal(gradeLocally(problem, old).correct, false, id)
+  }
 })
 
 test("reviewed alternate translation keys agree across varied finite models", () => {
