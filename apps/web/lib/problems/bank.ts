@@ -1,11 +1,13 @@
+import { subproofDerivations } from "./subproofs.ts"
 import { derivations } from "./derivations.ts"
 import { interpretationQuestions } from "./models.ts"
 import { symbolizations } from "./symbolization.ts"
 import { syntaxQuestions } from "./syntax.ts"
 import { categories, type Category, type Problem } from "./types.ts"
 
-export const bank: readonly Problem[] = [...derivations, ...symbolizations, ...syntaxQuestions, ...interpretationQuestions]
+export const bank: readonly Problem[] = [...derivations, ...subproofDerivations, ...symbolizations, ...syntaxQuestions, ...interpretationQuestions]
 export const categoryIds = Object.keys(categories) as Category[]
+export const examCategoryIds = categoryIds.filter(category => category !== "subproofs")
 export const byId = Object.fromEntries(bank.map(item => [item.id, item])) as Record<string, Problem | undefined>
 
 export function practiceOrder(category: Category, recent: readonly string[], random = Math.random): string[] {
@@ -17,12 +19,13 @@ export function practiceOrder(category: Category, recent: readonly string[], ran
 }
 
 export function progressThrough(category: Category, recent: readonly string[], random = Math.random): string[] {
+  if (category === "subproofs") return subproofDerivations.map(question => question.id)
   const levels = ["Introductory", "Intermediate", "Advanced"]
   return practiceOrder(category, recent, random).sort((left, right) =>
     levels.indexOf(byId[left]!.difficulty) - levels.indexOf(byId[right]!.difficulty))
 }
 
 export function examOrder(recent: readonly string[], random = Math.random): string[] {
-  const queues = categoryIds.map(category => practiceOrder(category, recent, random))
+  const queues = examCategoryIds.map(category => practiceOrder(category, recent, random))
   return [0, 1].flatMap(index => queues.map(queue => queue[index]))
 }

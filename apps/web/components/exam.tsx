@@ -8,7 +8,7 @@ import { parseFormula, printFormula } from "@/lib/formula"
 import { useStored } from "./storage"
 import { Button } from "./ui/button"
 import { validationEngine, type Grade } from "@/lib/grading"
-import { byId, categoryIds, examOrder } from "@/lib/problems/bank"
+import { byId, examCategoryIds, examOrder } from "@/lib/problems/bank"
 import { categories, type Answer, type Problem } from "@/lib/problems/types"
 import { emptyProgress, examMinutes, hasAnswer, type Exam } from "@/lib/session"
 
@@ -133,7 +133,7 @@ function ExamResults({ exam, results }: { exam: Exam; results: Grade[] }) {
     <div className="score-summary">
       <div className="score"><strong>{correct}/{results.length}</strong><span>Correct answers</span></div>
       <dl className="category-results">
-        {categoryIds.map(category => {
+        {examCategoryIds.map(category => {
           const grades = results.filter((_, index) => byId[exam.ids[index]]?.category === category)
           return <div key={category}><dt>{categories[category].title}</dt><dd>{grades.filter(grade => grade.correct).length}/{grades.length}</dd></div>
         })}

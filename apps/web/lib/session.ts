@@ -1,3 +1,4 @@
+import { isDerivation } from "./problems/types.ts"
 import { byId } from "./problems/bank.ts"
 import type { Answer } from "./problems/types.ts"
 
@@ -22,7 +23,7 @@ export function recordAttempt(progress: Progress, id: string, correct: boolean):
 export function hasAnswer(id: string, answer: Answer | undefined): boolean {
   if (answer === undefined) return false
   if (typeof answer !== "string") return true
-  if (byId[id]?.category !== "derivations") return !!answer.trim()
+  if (!isDerivation(byId[id])) return !!answer.trim()
   return answer.split("\n").some(row => {
     const contents = row.trim()
     return contents && contents !== "--" && !/:\s*PR\s*$/.test(contents)

@@ -16,7 +16,8 @@ function gradeSelection(expected: number[], answer: Answer) {
 export function gradeLocally(problem: Problem, answer: Answer | undefined): Grade {
   if (answer === undefined || answer === "") return { correct: false, message: "No answer submitted." }
   switch (problem.category) {
-    case "derivations": {
+    case "derivations":
+    case "subproofs": {
       if (typeof answer !== "string") return { correct: false, message: "Enter a proof." }
       const issue = validateProof(answer, problem.premises, problem.conclusion, problem.system)
       return issue ? { correct: false, message: "The proof is incomplete or incorrect.", detail: issue.message, line: issue.line } : { correct: true, message: "Correct!" }

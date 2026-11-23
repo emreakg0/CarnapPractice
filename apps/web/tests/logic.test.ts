@@ -4,7 +4,7 @@ import { analyzeVariables, children, FormulaError, formulaKey, isMagnusVariable,
 import { gradeLocally } from "../lib/grading.ts"
 import { evaluateFormula, type Interpretation } from "../lib/interpretation.ts"
 import { parseProofFormula, proofRows, rulesFor, rutgersProofSystem, validateProof, type ProofSystem } from "../lib/proof.ts"
-import { bank, byId, categoryIds, examOrder, practiceOrder, progressThrough } from "../lib/problems/bank.ts"
+import { bank, byId, categoryIds, examCategoryIds, examOrder, practiceOrder, progressThrough } from "../lib/problems/bank.ts"
 import { syntaxSelection } from "../lib/problems/syntax.ts"
 import { emptyProgress, hasAnswer, recordAttempt } from "../lib/session.ts"
 import magnusFixtures from "./magnusql-fixtures.json" with { type: "json" }
@@ -43,7 +43,7 @@ test("ZachTFL justification names and aliases match the Calgary rule parser", ()
 })
 
 test("ZachTFL proof replay agrees with the observed public Carnap widget", () => {
-  assert.equal(zachFixtures.length, 226)
+  assert.equal(zachFixtures.length, 241)
   for (const { id, proof, premises, target, carnapSequent, carnapMarks, openGoal, system } of zachFixtures) {
     const issue = validateProof(proof, premises, target, system as ProofSystem | undefined)
     assert.equal(!issue, carnapSequent !== null && !openGoal, id)
@@ -280,13 +280,14 @@ test("finite interpretation witnesses, counterexamples, identity, and invalid mo
   assert.equal(gradeLocally(question, false).correct, true)
 })
 
-test("the bank has 120 unique graded problems and generated answers match authored keys", () => {
-  assert.equal(new Set(bank.map(problem => problem.id)).size, 120)
-  for (const category of categoryIds) assert.equal(bank.filter(item => item.category === category).length, 30)
+test("the bank has 135 unique graded problems and generated answers match authored keys", () => {
+  assert.equal(new Set(bank.map(problem => problem.id)).size, 135)
+  for (const category of categoryIds) assert.equal(bank.filter(item => item.category === category).length, category === "subproofs" ? 15 : 30)
   for (const problem of bank) {
     assert.equal(gradeLocally(problem, undefined).correct, false)
     switch (problem.category) {
       case "derivations":
+      case "subproofs":
         assert.equal(gradeLocally(problem, problem.solution).correct, true, problem.id)
         assert.equal(gradeLocally(problem, problem.conclusion + " :PR").correct, false, problem.id)
         break
@@ -330,7 +331,8 @@ test("question queues defer recent successes and exams are balanced without dupl
   assert.deepEqual(order.slice(-2), ["tfl-2", "tfl-1"])
   const exam = examOrder(recent, () => 0.5)
   assert.equal(new Set(exam).size, 8)
-  for (const category of categoryIds) assert.equal(exam.filter(id => byId[id]?.category === category).length, 2)
+  for (const category of examCategoryIds) assert.equal(exam.filter(id => byId[id]?.category === category).length, 2)
+  assert.ok(exam.every(id => byId[id]?.category !== "subproofs"))
   let progress = recordAttempt(emptyProgress, "tfl-3", false)
   progress = recordAttempt(progress, "tfl-3", true)
   progress = recordAttempt(progress, "tfl-3", false)

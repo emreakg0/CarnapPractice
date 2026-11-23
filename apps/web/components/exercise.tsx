@@ -5,14 +5,14 @@ import { useState } from "react"
 import { parseFormula, printFormula } from "@/lib/formula"
 import type { Grade } from "@/lib/grading"
 import { parseProofFormula, rulesFor, rutgersProofSystem, validateProof } from "@/lib/proof"
-import type { Answer, Derivation, Problem } from "@/lib/problems/types"
+import { isDerivation, type Answer, type Derivation, type Problem } from "@/lib/problems/types"
 import { FormulaInput, ModelFields, ModelReview, SymbolizationKey, SyntaxChoices, SyntaxReview } from "./exercise-fields"
 import { ProofEditor, ProofPreview, ProofStatus } from "./proof-editor"
 import { useExerciseStyle } from "./settings"
 import { Button } from "./ui/button"
 
 export function starterAnswer(problem: Problem) {
-  return problem.category === "derivations" ? problem.premises.map(formula => `${printFormula(parseProofFormula(formula, problem.system))} :PR\n`).join("") : undefined
+  return isDerivation(problem) ? problem.premises.map(formula => `${printFormula(parseProofFormula(formula, problem.system))} :PR\n`).join("") : undefined
 }
 
 export function Exercise({ problem, number, answer, onChange, onSubmit, exam = false, grade, busy = false, saved = false }: {
@@ -24,7 +24,7 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
   const [reveal, setReveal] = useState(false)
   const modern = style === "modern"
   const proof = typeof answer === "string" ? answer : ""
-  const proofIssue = !exam && problem.category === "derivations" ? validateProof(proof, problem.premises, problem.conclusion, problem.system) : undefined
+  const proofIssue = !exam && isDerivation(problem) ? validateProof(proof, problem.premises, problem.conclusion, problem.system) : undefined
   const actions = <div className="exercise-actions">
     <Button type="submit" disabled={busy} className="exercise-submit">{exam ? "Save answer" : "Submit"} <CircleCheck aria-hidden="true" size={16} /></Button>
     {!exam && (problem.category !== "symbolization" || modern) && <Button type="button" disabled={busy} onClick={() => onSubmit(false)} className="exercise-check">
@@ -39,8 +39,8 @@ export function Exercise({ problem, number, answer, onChange, onSubmit, exam = f
     }}>
       <span className="exercise-number"><span className="sr-only">Question </span>{number}</span>
       <span className="exercise-points">1 pts</span>
-      <div className={`exercise-body ${grade?.correct || (!exam && problem.category === "derivations" && !proofIssue) ? "is-correct" : grade ? "is-incorrect" : ""}`}>
-        {problem.category === "derivations" && <>
+      <div className={`exercise-body ${grade?.correct || (!exam && isDerivation(problem) && !proofIssue) ? "is-correct" : grade ? "is-incorrect" : ""}`}>
+        {isDerivation(problem) && <>
           <div className="proof-widget">
             <div className="proof-goal classic-prompt">
               <span className="sr-only">{problem.prompt}</span>
@@ -103,7 +103,7 @@ export function ProofGoal({ problem }: { problem: Derivation }) {
 
 export function Solution({ problem }: { problem: Problem }) {
   return <>
-    {problem.category === "derivations" && <ProofPreview system={problem.system} source={problem.solution} />}
+    {isDerivation(problem) && <ProofPreview system={problem.system} source={problem.solution} />}
     {problem.category === "symbolization" && <p className="math">{printFormula(parseFormula(problem.answers[0], problem.system))}</p>}
     {problem.category === "syntax" && <ul className="solution-choices">{problem.correct.map(index => <li key={index} className="math">{problem.options[index]}</li>)}</ul>}
     {problem.category === "interpretations" && (problem.options ? <ModelReview problem={problem} /> : <p><strong>{problem.expected ? "True" : "False"}</strong></p>)}
@@ -114,7 +114,7 @@ export function Solution({ problem }: { problem: Problem }) {
 const shortcutPairs = [["¬", "~"], ["∧", "&"], ["∨", String.raw`\/`], ["→", "->"], ["↔", "<->"], ["⊥", "!?"]]
 
 function SyntaxReference({ problem }: { problem: Problem }) {
-  const derivation = problem.category === "derivations"
+  const derivation = isDerivation(problem)
   return <details className="syntax-reference">
     <summary>{derivation ? "Syntax and rules" : "Syntax reference"}</summary>
     <dl className="shortcut-grid">

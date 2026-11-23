@@ -1,0 +1,120 @@
+import { rutgersProofSystem } from "../proof.ts"
+import type { Derivation } from "./types.ts"
+
+const exercises = [
+  {
+    premises: ["P"], conclusion: "Q -> (P & Q)",
+    work: "   Q:AS;   P:R1;   P & Q:&I3,2;Q -> (P & Q):->I2-4",
+    hint: "Start with the antecedent of the target. Which given line can you bring into its scope?",
+    explanation: "Assume Q to make the second conjunct available. Reiterate the given P, build the conjunction, and discharge Q.",
+    concepts: ["Conditional introduction", "Reiteration"],
+  },
+  {
+    premises: ["P & R"], conclusion: "(P -> Q) -> Q",
+    work: "   P -> Q:AS;   P:&E1;   Q:->E2,3;(P -> Q) -> Q:->I2-4",
+    hint: "The entire inner conditional is the assumption.",
+    explanation: "The premise supplies P but gives no conditional to apply to it. Assume P → Q, derive Q in that range, and discharge the assumed conditional.",
+    concepts: ["Conditional introduction", "Compound assumption"],
+  },
+  {
+    premises: ["P <-> Q", "P"], conclusion: "(R | S) -> (Q & (R | S))",
+    work: "   R | S:AS;   Q:<->E1,2;   Q & (R | S):&I4,3;(R | S) -> (Q & (R | S)):->I3-5",
+    hint: "Assume the disjunction as one formula. Which given lines yield the other conjunct?",
+    explanation: "The biconditional and P yield Q. The other conjunct is the disjunction assumed only inside the range, so close it with conditional introduction.",
+    concepts: ["Conditional introduction", "Disjunction as an assumption", "Biconditional elimination"],
+  },
+  {
+    premises: [], conclusion: "P -> (P | (Q & R))",
+    work: "   P:AS;   P | (Q & R):|I1;P -> (P | (Q & R)):->I1-2",
+    hint: "The left disjunct already matches the antecedent.",
+    explanation: "With no premises, the assumption P gives the first usable line. It yields the disjunction, and discharging P produces the theorem.",
+    concepts: ["Conditional introduction", "Disjunction introduction", "Theorem"],
+  },
+  {
+    premises: ["(P | Q) -> R"], conclusion: "P -> (R & P)",
+    work: "   P:AS;   P | Q:|I2;   R:->E1,3;   R & P:&I4,2;P -> (R & P):->I2-5",
+    hint: "Try P as the assumption and look at how it can build the given conditional’s antecedent.",
+    explanation: "Assuming P lets you form P ∨ Q and derive R. Both conjuncts can then be joined inside the range before P is discharged.",
+    concepts: ["Conditional introduction", "Building an antecedent"],
+  },
+  {
+    premises: ["P | Q", "P <-> R", "Q -> (R & S)"], conclusion: "T -> (R & T)",
+    work: "   P:AS;   R:<->E2,4;--;   Q:AS;   R & S:->E3,7;   R:&E8;R:|E1,4-5,7-9;   T:AS;   R & T:&I10,11;T -> (R & T):->I11-12",
+    hint: "Which two assumptions let you get R from the disjunction? Save the target's antecedent for a separate range.",
+    explanation: "The first two sibling ranges get R by different routes. Their case split makes R available at the top level, so the final range can use it with the assumption T.",
+    concepts: ["Disjunction elimination", "Sibling subproofs", "Conditional introduction"],
+  },
+  {
+    premises: ["~Q"], conclusion: "~(P & (~P | Q))",
+    work: "   P & (~P | Q):AS;   P:&E2;   ~P | Q:&E2;   ~P:DS4,1;   !?:~E3,5;~(P & (~P | Q)):~I2-6",
+    hint: "Assume the whole conjunction. Use ¬Q on the disjunction inside it.",
+    explanation: "The assumption exposes both P and a disjunction that yields ¬P given ¬Q. The contradiction depends on the assumed conjunction, so negate that conjunction by closing the range.",
+    concepts: ["Negation introduction", "Contradiction", "Disjunctive syllogism"],
+  },
+  {
+    premises: [], conclusion: "~P | (P | Q)",
+    work: "   ~(~P | (P | Q)):AS;   ~~P & ~(P | Q):DeM1;   ~~P:&E2;   ~(P | Q):&E2;   ~P & ~Q:DeM4;   ~P:&E5;   !?:~E3,6;~P | (P | Q):IP1-7",
+    hint: "For IP, assume the negation of the entire target. Look for a De Morgan transformation.",
+    explanation: "The negative assumption gives both ¬¬P and ¬(P ∨ Q). The latter yields ¬P. IP discharges the assumption that generated the contradiction.",
+    concepts: ["Indirect proof", "De Morgan", "Contradiction"],
+  },
+  {
+    premises: ["P"], conclusion: "Q <-> (P & Q)",
+    work: "   Q:AS;   P & Q:&I1,2;--;   P & Q:AS;   Q:&E5;Q <-> (P & Q):<->I2-3,5-6",
+    hint: "Use each side of the biconditional as the first line of a separate range.",
+    explanation: "The first range adds the given P to Q. The second extracts Q from the stronger assumption. Both ranges are closed before they are cited together.",
+    concepts: ["Biconditional introduction", "Sibling subproofs", "Compound assumption"],
+  },
+  {
+    premises: [], conclusion: "~((P & ~P) | (~Q & Q))",
+    work: "   (P & ~P) | (~Q & Q):AS;      P & ~P:AS;      P:&E2;      ~P:&E2;      !?:~E3,4;   --;      ~Q & Q:AS;      ~Q:&E7;      Q:&E7;      !?:~E8,9;   !?:|E1,2-5,7-10;~((P & ~P) | (~Q & Q)):~I1-11",
+    hint: "Assume the entire disjunction first. Can each of its cases reach the same contradiction?",
+    explanation: "Each inner case supplies its own contradiction. The case split transfers ⊥ to the outer scope so negation introduction can discharge the entire disjunction.",
+    concepts: ["Disjunction elimination", "Nested sibling subproofs", "Negation introduction"],
+  },
+  {
+    premises: ["Q"], conclusion: "P | (~P & Q)",
+    work: "   P:AS;   P | (~P & Q):|I2;--;   ~P:AS;   ~P & Q:&I5,1;   P | (~P & Q):|I6;P | (~P & Q):LEM2-3,5-7",
+    hint: "Choose opposite assumptions. Think about which side of the target each assumption supports.",
+    explanation: "P supplies the left disjunct. Under ¬P, combine it with the given Q to supply the right disjunct. LEM discharges the two opposite assumptions.",
+    concepts: ["Law of Excluded Middle", "Opposite assumption ranges", "Compound conclusion"],
+  },
+  {
+    premises: [], conclusion: "((P -> Q) & (P -> R)) -> (P -> (Q & R))",
+    work: "   (P -> Q) & (P -> R):AS;   P -> Q:&E1;   P -> R:&E1;      P:AS;      Q:->E2,4;      R:->E3,4;      Q & R:&I5,6;   P -> (Q & R):->I4-7;((P -> Q) & (P -> R)) -> (P -> (Q & R)):->I1-8",
+    hint: "Open the outer conditional first. What extra assumption would let you use both extracted conditionals?",
+    explanation: "The outer scope supplies the two conditionals. The inner assumption gives both consequents. Closing the inner range leaves a conditional in the outer scope, which is then discharged separately.",
+    concepts: ["Nested assumptions", "Conditional introduction", "Parallel conditional elimination"],
+  },
+  {
+    premises: ["Q"], conclusion: "(P | ~P) & Q",
+    work: "   ~((P | ~P) & Q):AS;      P:AS;      P | ~P:|I3;      (P | ~P) & Q:&I4,1;      !?:~E2,5;   ~P:~I3-6;   P | ~P:|I7;   (P | ~P) & Q:&I8,1;   !?:~E2,9;(P | ~P) & Q:IP2-10",
+    hint: "Assume the negation of the full conjunction. Inside that range, test what happens if P holds.",
+    explanation: "The inner assumption P makes the conjunction true in conflict with the outer assumption. Discharge P to get ¬P, which also makes the conjunction true. That second contradiction closes the outer IP range.",
+    concepts: ["Nested indirect proof", "Negation introduction", "Compound conclusion"],
+  },
+  {
+    premises: [], conclusion: "P <-> ~~P",
+    work: "   P:AS;      ~P:AS;      !?:~E1,2;   ~~P:~I2-3;--;   ~~P:AS;   P:DNE6;P <-> ~~P:<->I1-4,6-7",
+    hint: "The forward direction introduces a negation. Which assumption is the formula being negated?",
+    explanation: "In the forward range, a nested assumption of ¬P contradicts the outer P, yielding ¬¬P. In a separate reverse range DNE yields P. The biconditional cites both outer ranges.",
+    concepts: ["Biconditional introduction", "Nested negation introduction", "Double negation elimination"],
+  },
+  {
+    premises: [], conclusion: "(P | Q) -> ((P -> R) -> ((Q -> R) -> R))",
+    work: "   P | Q:AS;      P -> R:AS;         Q -> R:AS;            P:AS;            R:->E2,4;         --;            Q:AS;            R:->E3,7;         R:|E1,4-5,7-8;      (Q -> R) -> R:->I3-9;   (P -> R) -> ((Q -> R) -> R):->I2-10;(P | Q) -> ((P -> R) -> ((Q -> R) -> R)):->I1-11",
+    hint: "Open the three antecedents in order. Inside all three, use the disjunction to decide the two cases.",
+    explanation: "The sibling case ranges use different assumed conditionals to derive R. Once ∨E closes the case split, discharge the three remaining assumptions from the innermost scope outward.",
+    concepts: ["Nested sibling subproofs", "Disjunction elimination", "Multiple assumption discharge"],
+  },
+]
+
+export const subproofDerivations: Derivation[] = exercises.map(({ work, ...exercise }, index) => ({
+  ...exercise,
+  id: `subproof-${index + 1}`,
+  category: "subproofs",
+  system: rutgersProofSystem,
+  difficulty: index < 5 ? "Introductory" : index < 10 ? "Intermediate" : "Advanced",
+  prompt: "Derive the conclusion from the given premises.",
+  solution: [...exercise.premises.map(formula => formula + ":PR"), ...work.split(";")].join("\n"),
+}))

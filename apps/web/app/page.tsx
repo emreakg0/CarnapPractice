@@ -35,7 +35,7 @@ export default function Home() {
               <span className="category-mark" aria-hidden="true">{categories[id].mark}</span>
               <h3>{categories[id].title}</h3>
               <p>{categories[id].description}</p>
-              <span className="category-count">{bank.filter(p => p.category === id).length} questions</span>
+              <span className="category-count">{bank.filter(p => p.category === id).length} Questions</span>
             </Link>
           ))}
         </div>

@@ -77,8 +77,8 @@ export function Practice({ category }: { category: Category }) {
             ? <Button variant="outline" onClick={() => navigate(session.index + 1)}>Next</Button>
             : <Button variant="outline" onClick={() => {
               navigate(0)
-              setSession(old => ({ ...old, order: practiceOrder(category, progress.recent), index: 0 }))
-            }}>Shuffle again</Button>}
+              setSession(old => ({ ...old, order: category === "subproofs" ? progressThrough(category, progress.recent) : practiceOrder(category, progress.recent), index: 0 }))
+            }}>{category === "subproofs" ? "Back to question 1" : "Shuffle again"}</Button>}
         </div>
       </div>
       <Exercise key={id} problem={problem} number={session.index + 1} answer={session.drafts[id] ?? starterAnswer(problem)}

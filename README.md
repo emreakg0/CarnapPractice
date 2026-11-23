@@ -29,6 +29,7 @@ change the theme. Both interfaces use the same drafts, question bank, and grader
 | FOL Interpretations | 30 | Selecting true or false sentences in finite models with explicit domains, referents, and extensions |
 
 See the [PS4–8 topic distribution and coverage gaps](docs/midterm-2-bank.md).
+The dedicated [TFL Derivations with Subproofs track](docs/tfl-subproofs.md) adds 15 ordered practice-only questions to the 120 core exercises.
 
 Practice gives immediate feedback, hints, worked solutions, and retries.
 Check previews the grade. Submit records the practice attempt. The practice

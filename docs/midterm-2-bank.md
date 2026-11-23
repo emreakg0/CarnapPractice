@@ -2,7 +2,7 @@
 
 The supplied blueprint summarizes Rutgers Introduction to Logic Problem
 Sets 4–8. It guided exercise format, notation, and progression. The
-bank contains 120 questions, including 80 original additions. The
+core bank contains 120 questions, including 80 original additions. The separate [subproof practice track](tfl-subproofs.md) adds 15 questions. The
 assignments offer practice evidence and the actual midterm questions
 remain unknown.
 
