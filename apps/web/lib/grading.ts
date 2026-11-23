@@ -1,4 +1,4 @@
-import { analyzeVariables, formulaKey, isMagnusVariable, parseFormula, printFormula } from "./formula.ts"
+import { analyzeVariables, isMagnusVariable, parseFormula, printFormula, translationKey } from "./formula.ts"
 import { evaluateFormula } from "./interpretation.ts"
 import { validateProof } from "./proof.ts"
 import type { Answer, Problem } from "./problems/types.ts"
@@ -29,7 +29,8 @@ export function gradeLocally(problem: Problem, answer: Answer | undefined): Grad
       }
       const free = analyzeVariables(formula, problem.system ? isMagnusVariable : undefined).free
       if (free.length) return { correct: false, message: "The formula has free variables.", detail: `Bind ${free.join(", ")} to make a sentence.` }
-      const correct = problem.answers.some(template => formulaKey(parseFormula(template, problem.system), true) === formulaKey(formula, true))
+      const key = translationKey(formula)
+      const correct = problem.answers.some(template => translationKey(parseFormula(template, problem.system)) === key)
       return { correct, message: correct ? "Correct!" : "Not quite. Try again?", detail: `Read as ${printFormula(formula)}.` }
     }
     case "syntax": return gradeSelection(problem.correct, answer)

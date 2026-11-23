@@ -71,9 +71,10 @@ scores are stored on the device.
 - Translation grading compares parsed answers with specific, reviewed
   alternatives. It normalizes bound-variable renaming, identity
   symmetry, and operand order for conjunction, disjunction, and
-  biconditional. A mathematically equivalent translation outside those
-  patterns can be marked incorrect. The criteria are deliberately
-  narrower than Carnap's first-order translation checker.
+  biconditional. It also recognizes quantifier negation, double negation,
+  De Morgan's laws, and conditional-to-disjunction equivalence. Other
+  mathematically equivalent translations can still be marked incorrect:
+  the checker remains narrower than Carnap's first-order checker.
 - Syntax questions and models are built from fixed specifications.
   Their computed results must agree with independently authored answer
   keys before they enter the bank. Tests exercise every worked proof

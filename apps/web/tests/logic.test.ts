@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { analyzeVariables, children, FormulaError, formulaKey, isMagnusVariable, mainOperator, parseFormula, printFormula } from "../lib/formula.ts"
+import { analyzeVariables, children, FormulaError, formulaKey, isMagnusVariable, mainOperator, parseFormula, printFormula, translationKey } from "../lib/formula.ts"
 import { gradeLocally } from "../lib/grading.ts"
 import { evaluateFormula, type Interpretation } from "../lib/interpretation.ts"
 import { parseProofFormula, proofRows, rulesFor, rutgersProofSystem, validateProof, type ProofSystem } from "../lib/proof.ts"
@@ -169,6 +169,26 @@ test("symbolization distinguishes grammar, open formulas, incorrect meaning, and
   assert.equal(gradeLocally(cats, "∀z(C(z) → ∃w(L(z,w) ∧ C(w)))").correct, true)
   assert.equal(gradeLocally(cats, "~Ex(Cx & ~Ey(Cy & Lxy))").correct, true)
   assert.equal(gradeLocally(byId["sym-10"]!, "Ax(Fex | Fox)").correct, false)
+})
+
+
+test("symbolization accepts equivalent quantifier-negation and conditional forms", () => {
+  const birds = byId["sym-3"]
+  if (birds?.category !== "symbolization") assert.fail("Missing bird/mammal exercise")
+  for (const answer of [
+    "~Ex(Bx&Mx)", "Ax~(Bx&Mx)", "Ax(Bx->~Mx)",
+    "Ax(~Bx|~Mx)", "~Ex(Mx&Bx)", "Ax(Mx->~Bx)",
+  ]) {
+    assert.equal(gradeLocally(birds, answer).correct, true, answer)
+    assert.equal(gradeLocally({ ...birds, system: "magnusQL" }, answer).correct, true, "Magnus: " + answer)
+  }
+  for (const answer of ["Ax(~Bx&Mx)", "Ax~(Bx|Mx)", "Ex(Bx&Mx)", "Ax(Bx->Mx)"]) {
+    assert.equal(gradeLocally(birds, answer).correct, false, answer)
+  }
+  assert.equal(translationKey(parseFormula("~AxBx")), translationKey(parseFormula("Ex~Bx")))
+  assert.equal(translationKey(parseFormula("~ExBx")), translationKey(parseFormula("Ax~Bx")))
+  assert.equal(translationKey(parseFormula("~~AxBx")), translationKey(parseFormula("AxBx")))
+  assert.notEqual(translationKey(parseFormula("Ax(Bx&Mx)")), translationKey(parseFormula("~Ex(Bx&Mx)")))
 })
 
 test("all derived rules are checked for their actual inference patterns", () => {

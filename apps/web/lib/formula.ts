@@ -224,3 +224,48 @@ function flattenBinary(formula: Formula, operator: "∧" | "∨"): Formula[] {
     ? [...flattenBinary(formula.left, operator), ...flattenBinary(formula.right, operator)]
     : [formula]
 }
+
+/**
+ * A sound, deliberately incomplete equivalence key for translation exercises.
+ * Pushes negation through supported connectives and quantifiers; rewrites
+ * conditionals as disjunctions. Do not use for strict proof-rule matching.
+ */
+export function translationKey(formula: Formula): string {
+  function normalize(node: Formula, negated = false): Formula {
+    switch (node.kind) {
+      case "not":
+        return normalize(node.body, !negated)
+      case "quantifier":
+        return {
+          kind: "quantifier",
+          op: negated ? (node.op === "∀" ? "∃" : "∀") : node.op,
+          variable: node.variable,
+          body: normalize(node.body, negated),
+        }
+      case "binary":
+        if (node.op === "→") {
+          // P → Q is equivalent to ¬P ∨ Q.
+          return normalize({
+            kind: "binary", op: "∨",
+            left: { kind: "not", body: node.left }, right: node.right,
+          }, negated)
+        }
+        if (node.op === "∧" || node.op === "∨") {
+          return {
+            kind: "binary",
+            op: negated ? (node.op === "∧" ? "∨" : "∧") : node.op,
+            left: normalize(node.left, negated),
+            right: normalize(node.right, negated),
+          }
+        }
+        // Preserve biconditionals without expanding nested ones exponentially.
+        const biconditional: Formula = {
+          ...node, left: normalize(node.left), right: normalize(node.right),
+        }
+        return negated ? { kind: "not", body: biconditional } : biconditional
+      default:
+        return negated ? { kind: "not", body: node } : node
+    }
+  }
+  return formulaKey(normalize(formula), true)
+}
